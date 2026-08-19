@@ -62,7 +62,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ColonyOptimizer-win-x64
           path: artifacts

@@ -4,9 +4,9 @@
     "net10.0": {
       "coverlet.collector": {
         "type": "Direct",
-        "requested": "[6.0.4, )",
-        "resolved": "6.0.4",
-        "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
+        "requested": "[10.0.1, )",
+        "resolved": "10.0.1",
+        "contentHash": "27jXSV/0DbVqF5jDrAxuQFZ9oaz6gmG03p8ttxAFk+X0M4woFYj7MoWDLCna5EGLb0CE6OE7X6ZH3Wt5smTtaA=="
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
@@ -180,33 +180,6 @@
           "ColonyOptimizer.Core": "[1.0.0, )",
           "Google.OrTools": "[9.15.6755, )"
         }
-      }
-    },
-    "net10.0/win-x64": {
-      "Google.OrTools.runtime.linux-arm64": {
-        "type": "Transitive",
-        "resolved": "9.15.6755",
-        "contentHash": "7YaKuI4q1uU9ibelXXawY7zx/5hQ1vMBKLFFK6kQRgO082wMlHx6NmfMaTFZA94b4D4xbFaA7TGAehoEbWciEg=="
-      },
-      "Google.OrTools.runtime.linux-x64": {
-        "type": "Transitive",
-        "resolved": "9.15.6755",
-        "contentHash": "RupvZKKPXdUCWXdGFo8COXcp4YiQIjS5Bhlh9bVRWZqB1RjtVGQFscEwtN6wTZEjUjb49sE0lNo784W/LjQFHg=="
-      },
-      "Google.OrTools.runtime.osx-arm64": {
-        "type": "Transitive",
-        "resolved": "9.15.6755",
-        "contentHash": "WJw1KPoOi3BWmf6sqCMi8kDmjifuA6Bw/UC6He7jnHRFIixtLZ1wCSIiG4droej7HQI1PiNVTRb82udw9ilS7g=="
-      },
-      "Google.OrTools.runtime.osx-x64": {
-        "type": "Transitive",
-        "resolved": "9.15.6755",
-        "contentHash": "f0oTHbcoM2hBRyUVWvIR8cH2m5CibAZezK3mrPXNmoXKDjgoJhmheeovgajXu6/ax1RW7529m8yS6eHkmaZCOA=="
-      },
-      "Google.OrTools.runtime.win-x64": {
-        "type": "Transitive",
-        "resolved": "9.15.6755",
-        "contentHash": "Tox7pDhrVIfG7OdV7ISikiO5coioZ0FgtyK/H8cayzito4r512Oly/yi19TXjuqK8pKHD6BJOR0fY0aEkb3Nuw=="
       }
     }
   }

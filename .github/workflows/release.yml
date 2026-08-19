@@ -22,9 +22,9 @@ jobs:
       COLONY_SURVIVAL_GAMEDATA: ${{ github.workspace }}\work\ColonySurvival\gamedata
     steps:
       - name: Check out Colony Optimizer
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Check out public Colony Survival data
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: pipliz/ColonySurvival
           path: work/ColonySurvival

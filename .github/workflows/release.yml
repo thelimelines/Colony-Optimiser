@@ -36,7 +36,7 @@ jobs:
       - name: Restore dependencies and refresh the lock graph
         shell: pwsh
         run: |
-          dotnet restore ColonyOptimizer.slnx --force-evaluate
+          dotnet restore ColonyOptimizer.slnx --runtime win-x64 --force-evaluate
           dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --force-evaluate
           dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --force-evaluate
       - name: Run tests

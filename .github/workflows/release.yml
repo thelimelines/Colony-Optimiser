@@ -33,12 +33,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - name: Restore locked dependencies
+      - name: Restore dependencies and refresh the lock graph
         shell: pwsh
         run: |
-          dotnet restore ColonyOptimizer.slnx --locked-mode
-          dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --locked-mode
-          dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --locked-mode
+          dotnet restore ColonyOptimizer.slnx --force-evaluate
+          dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --force-evaluate
+          dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --force-evaluate
       - name: Run tests
         run: dotnet test tests\ColonyOptimizer.Tests\ColonyOptimizer.Tests.csproj -c Release --no-restore
       - name: Build release package

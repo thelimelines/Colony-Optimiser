@@ -9,8 +9,8 @@ Creating a version tag publishes a GitHub release; it is not a dry run. Release 
 5. Create an annotated tag whose version exactly matches `Directory.Build.props`, then push it:
 
    ```powershell
-   git tag -a v1.0.0 -m "Colony Optimiser v1.0.0"
-   git push origin v1.0.0
+   git tag -a v1.0.1 -m "Colony Optimiser v1.0.1"
+   git push origin v1.0.1
    ```
 
 6. GitHub Actions checks out the required public game data, runs the test suite, publishes a self-contained Windows x64 portable ZIP, a per-machine MSI, and a Setup EXE bootstrapper, then creates SHA-256 checksums and attaches them to the GitHub release.
@@ -25,7 +25,7 @@ The release workflow refuses malformed versions and packages into a new `artifac
 To create the same package locally without publishing it, restore the solution and both projects in `installer` as described in `CONTRIBUTING.md`, then run:
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 1.0.0
+.\scripts\Publish-Release.ps1 -Version 1.0.1
 ```
 
 Use a clean workspace or remove the packages for that version before running the command. Inspect the ZIP, MSI, Setup EXE, and their checksum files under `artifacts`. Commit lock-file updates only when they result from an intentional dependency update.

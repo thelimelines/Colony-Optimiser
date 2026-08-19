@@ -24,7 +24,7 @@ This document records behaviour observed at that revision; it is not a declarati
 
 ## Automated checks
 
-`ColonyOptimizer.Tests` loads the checked-out vanilla `gamedata` through the manifest and asserts parsed recipes, tools, guards, science, cycle timing, worker timing, crop stages and drops, fletcher crossbow bolts, and crossbow ammunition references. The solver suite covers shared worker capacity, alternate recipes, forbidden recipes, tool durability replacement, science restrictions, chance output, external material, crop farms, and guard demand.
+`ColonyOptimizer.Tests` loads the checked-out vanilla `gamedata` through the manifest and asserts parsed recipes, tools, guards, science, cycle timing, worker timing, crop stages and drops, fletcher crossbow bolts, and crossbow ammunition references. Required CI checks out the exact commit recorded above. A separate weekly and manually dispatchable compatibility workflow tests the latest upstream default branch without blocking ordinary pull requests or releases. The solver suite covers shared worker capacity, alternate recipes, forbidden recipes, tool durability replacement, science restrictions, chance output, external material, crop farms, and guard demand.
 
 ## Known unresolved mechanics
 

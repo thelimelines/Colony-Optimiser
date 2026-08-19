@@ -23,22 +23,34 @@ jobs:
     steps:
       - name: Check out Colony Optimizer
         uses: actions/checkout@v7
-      - name: Check out public Colony Survival data
+      - name: Verify release tag matches project version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart('v')
+          [xml]$props = Get-Content Directory.Build.props
+          $projectVersion = [string]$props.Project.PropertyGroup.Version
+
+          if ($tagVersion -ne $projectVersion) {
+            throw "Release tag $tagVersion does not match Directory.Build.props version $projectVersion."
+          }
+      - name: Check out validated Colony Survival data
         uses: actions/checkout@v7
         with:
           repository: pipliz/ColonySurvival
+          ref: 7a5121763f93d768599e5d04b5c74f6645670f50
           path: work/ColonySurvival
           persist-credentials: false
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
-      - name: Restore dependencies and refresh the lock graph
+      - name: Restore locked dependencies
         shell: pwsh
         run: |
-          dotnet restore ColonyOptimizer.slnx --runtime win-x64 --force-evaluate
-          dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --force-evaluate
-          dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --force-evaluate
+          dotnet restore ColonyOptimizer.slnx --runtime win-x64 --locked-mode
+          dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --locked-mode
+          dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --locked-mode
       - name: Run tests
         run: dotnet test tests\ColonyOptimizer.Tests\ColonyOptimizer.Tests.csproj -c Release --no-restore
       - name: Build release package
@@ -73,4 +85,4 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           $assets = Get-ChildItem artifacts -File | ForEach-Object FullName
-          gh release create $env:TAG $assets --title "Colony Optimiser $env:TAG" --generate-notes
+          gh release create $env:TAG $assets --repo $env:GITHUB_REPOSITORY --title "Colony Optimiser $env:TAG" --generate-notes

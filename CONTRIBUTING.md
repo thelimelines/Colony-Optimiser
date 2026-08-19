@@ -13,7 +13,10 @@ Clone the game data into the location used by the test suite:
 
 ```powershell
 git clone https://github.com/pipliz/ColonySurvival.git work\ColonySurvival
+git -C work\ColonySurvival checkout --detach 7a5121763f93d768599e5d04b5c74f6645670f50
 ```
+
+The detached commit is the revision recorded in `docs/GAME_DATA_VALIDATION.md` and used by required CI. A separate weekly and manually dispatchable workflow checks the latest upstream default branch without blocking ordinary pull requests.
 
 Alternatively, set `COLONY_SURVIVAL_GAMEDATA` to the `gamedata` directory in an existing checkout for the current terminal session:
 
@@ -40,10 +43,12 @@ The project uses nullable reference types and implicit global usings. Follow the
 Create a branch from the latest `main` and make a focused change. Restoring packages requires an internet connection the first time:
 
 ```powershell
-dotnet restore ColonyOptimizer.slnx --runtime win-x64
-dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj
-dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj
+dotnet restore ColonyOptimizer.slnx --runtime win-x64 --locked-mode
+dotnet restore installer\ColonyOptimizer.Installer\ColonyOptimizer.Installer.wixproj --locked-mode
+dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --locked-mode
 ```
+
+These commands verify the committed NuGet dependency graph. Use `--force-evaluate` instead of `--locked-mode` only when intentionally updating dependencies, then review and commit the resulting lock-file changes with that update.
 
 ## Testing
 

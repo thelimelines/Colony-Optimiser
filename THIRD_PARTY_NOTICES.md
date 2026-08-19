@@ -1,6 +1,24 @@
 # Third-party notices
 
-The visualisation assets distributed with Colony Optimiser include the following open-source components.
+This inventory is based on the resolved Windows x64 package graph and the files produced by the Release build. Review it whenever a package lock file, target runtime, bundled asset, or installer dependency changes.
+
+## Redistributed .NET and native components
+
+The application package redistributes the following components:
+
+- **.NET 10 runtime and Windows Desktop runtime** — MIT; copyright Microsoft Corporation and .NET Foundation contributors. The self-contained application includes the runtime rather than requiring a separate .NET installation. Source and upstream notices: https://github.com/dotnet/dotnet
+- **CommunityToolkit.Mvvm 8.4.2** — MIT; copyright .NET Foundation and contributors. Source: https://github.com/CommunityToolkit/dotnet
+- **Google OR-Tools 9.15.6755 and its Windows x64 runtime** — Apache License 2.0; copyright Google LLC. The runtime package supplies OR-Tools and native dependency libraries including Abseil, bzip2, HiGHS, Protobuf, RE2, SCIP, and zlib. Source, licence, and dependency inventory: https://github.com/google/or-tools/tree/v9.15
+- **Google.Protobuf 3.33.1** — BSD 3-Clause; copyright Google Inc. Source: https://github.com/protocolbuffers/protobuf
+- **Microsoft.Data.Sqlite.Core 10.0.11** — MIT; copyright Microsoft Corporation. Source: https://github.com/dotnet/efcore
+- **SQLitePCLRaw.core and SQLitePCLRaw.provider.winsqlite3 3.0.5** — Apache License 2.0; copyright SourceGear, LLC. The provider uses the `winsqlite3` library supplied by Windows; it does not add a native SQLite library to the application package. Source: https://github.com/ericsink/SQLitePCL.raw
+- **Microsoft.Web.WebView2 SDK and Loader 1.0.4129.50** — distributed under the licence included in the NuGet package; copyright Microsoft Corporation. Colony Optimiser redistributes the SDK assemblies and `WebView2Loader.dll`, but not the Microsoft Edge WebView2 Runtime used to render the Visualisation tab. Project and feedback page: https://github.com/MicrosoftEdge/WebView2Feedback
+
+The release package includes this inventory, the Colony Optimiser MIT licence, the WebView2 licence and NOTICE file, the .NET runtime licence and third-party notices, and the bundled ELK licence. Package metadata and upstream repositories remain authoritative for component-specific terms. The OR-Tools NuGet packages declare Apache-2.0 but do not supply separate licence or NOTICE files; this inventory records OR-Tools and the native libraries found in the published Windows package.
+
+## Bundled visualisation assets
+
+The offline visualisation assets include the following open-source components.
 
 ## D3.js 5.16.0
 
@@ -35,6 +53,8 @@ Sources: https://github.com/tomshanley/d3-sankey-circular and https://github.com
 The node visualiser includes elkjs 0.12.0, licensed under the Eclipse Public License 2.0. The full licence text is included at `src/ColonyOptimizer.App/Assets/Visualisation/LICENSES/ELK-EPL-2.0.md` and is copied into the application package.
 
 Source: https://github.com/kieler/elkjs
+
+## Build-time dependencies
 
 ## WiX Toolset
 

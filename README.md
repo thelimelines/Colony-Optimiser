@@ -1,20 +1,34 @@
+<p align="center">
+  <img src="src/ColonyOptimizer.App/Assets/ColonyOptimizerLogo.png" alt="Colony Optimiser logo" width="280">
+</p>
+
 # Colony Optimiser
 
 Colony Optimiser is a Windows desktop planner for [Colony Survival](https://github.com/pipliz/ColonySurvival). Tell it what you want to produce and it calculates the jobs, ingredients, tools, area jobs, and defence ammunition needed for one production cycle.
 
 It is an independent community project and is not affiliated with Pipliz.
 
+## Features
+
+- Optimise production targets per second, minute, or game cycle.
+- Account for unlocked sciences, available tools, alternate recipes, efficiency, and spare capacity.
+- Model crop farms, forestry, miners, tool replacement, guards, traps, and defence ammunition.
+- Inspect the result as tables, an interactive Sankey diagram, or a node graph.
+- Save plans locally and optionally preselect progression from a read-only Colony Survival save.
+
+![Colony Optimiser displaying an interactive production-flow visualisation](docs/ColonyOptimiserVisualisation.png)
+
 ## Download and install
 
 1. Open this repository's [Releases](../../releases) page.
-2. Download `ColonyOptimizer-<version>-Setup.exe` for the normal Windows installation. It installs under Program Files and is listed in **Installed apps** for standard uninstallation.
+2. Download `ColonyOptimizer-<version>-Setup.exe` for the normal Windows installation. It installs under Program Files and appears in **Installed apps**, from which it can be uninstalled normally.
 3. Alternatively, download `ColonyOptimizer-<version>-win-x64.msi` for managed or scripted deployment, or `ColonyOptimizer-<version>-win-x64.zip` for a portable copy.
-4. Download the matching `.sha256` file for the chosen asset. Do not download the automatically generated `Source code` archives.
+4. We recommend downloading the matching `.sha256` file for the chosen asset. Do not download the automatically generated `Source code` archives.
 5. Run the setup program or MSI. For the portable ZIP, extract it somewhere you can write to and run `ColonyOptimizer.exe`.
 
-The download is self-contained for 64-bit Windows 10 or 11. It does not need .NET, Python, or Steam to be installed before it starts. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page and whose checksum matches the accompanying file.
+The download includes the .NET runtime for 64-bit Windows 10 or 11, so .NET, Python, and Steam do not need to be installed separately. The Visualisation tab uses the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/), which is included with Windows 11 and most supported Windows 10 installations but may need to be installed separately on uncommon or managed Windows images. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page. Check the accompanying checksum if you want to confirm that the download arrived unchanged.
 
-### Check the download
+### Check the download (OPTIONAL)
 
 In the folder containing the download, right-click and choose **Open in Terminal**, then run:
 
@@ -39,19 +53,28 @@ To create a plan:
 
 Plans are saved as `.colonyplan` files. The last opened or saved plan is restored when the application next starts.
 
+## Game compatibility
+
+Colony Optimiser loads recipes and timing dynamically rather than embedding one fixed set of Colony Survival values. Each release is nevertheless tested against a specific public upstream revision, recorded in [Game Data Validation](docs/GAME_DATA_VALIDATION.md). Unknown JSON fields are reported as diagnostics where possible, but structural game-data changes can require an application update.
+
 ## Privacy and safety
 
 - The app works locally and has no telemetry or sign-in.
+- Network access occurs only when you select **Download latest public data**; this downloads public Colony Survival data and commit information from GitHub. The app does not check for updates automatically.
 - Game saves are opened read-only. Do not attach save files to bug reports unless requested directly.
 - Settings, cached public game data, and logs are kept under your Windows local app-data folder. Delete the `ColonyOptimizer` folder there to reset the app.
-- Download updates only from this repository's Releases page and verify the SHA-256 checksum.
+- Download updates only from this repository's Releases page. Verifying the SHA-256 checksum is recommended, particularly for an unsigned release.
 
-Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). For ordinary bugs or requests, use the repository issue tracker and include the app version, a short description, and reproducible steps.
+Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). For ordinary bugs or requests, use the repository's [issue tracker](../../issues) and include the app version, a short description, and reproducible steps.
+
+## Inspiration
+
+The idea for Colony Optimiser was inspired by [Factory Calculator](https://factorycalculator.com/) and [Satisfactory Tools](https://www.satisfactorytools.com/1.0/production). I wanted a similar production-planning experience for Colony Survival, but web applications were outside my usual experience, so I built it as a downloadable local Windows application instead. This also keeps plans and save-derived data on your own computer.
 
 ## For contributors
 
-Technical material is kept out of the user guide. See [CONTRIBUTING.md](CONTRIBUTING.md), [release instructions](docs/RELEASING.md), [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), and [game-data validation](docs/GAME_DATA_VALIDATION.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Technical material is kept out of the user guide. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then see the [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), [game-data validation](docs/GAME_DATA_VALIDATION.md), and [release instructions](docs/RELEASING.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## License
+## Licence
 
-This project is licensed under the [MIT License](LICENSE).
+This project is released under the [MIT Licence](LICENSE).

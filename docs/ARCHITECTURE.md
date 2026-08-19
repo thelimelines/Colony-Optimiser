@@ -1,26 +1,35 @@
 # Architecture
 
-`ColonyOptimizer.Core` contains the normalised model and persisted plan types. `ColonyOptimizer.GameData` resolves a game-data root, follows `baseconfig/modInfo.json`, reads timing, and normalises recognised game JSON. `ColonyOptimizer.Optimization` has no WPF dependency and constructs the CP-SAT production model. `ColonyOptimizer.App` is the WPF/MVVM UI, file persistence, exports, settings, bounded JSON-line logging, and an offline WebView2 visualisation surface.
+## Project boundaries
+
+- `ColonyOptimizer.Core` contains the normalised domain model and persisted-plan types. It has no project dependencies.
+- `ColonyOptimizer.GameData` depends on Core. It resolves a game-data root, follows `baseconfig/modInfo.json`, reads save data and timing, and normalises recognised game JSON.
+- `ColonyOptimizer.Optimization` depends on Core. It has no WPF dependency and constructs the CP-SAT production model.
+- `ColonyOptimizer.App` depends on the other three projects. It provides the WPF/MVVM interface, plan persistence, exports, settings, bounded JSON-lines logging, and an offline WebView2 visualisation surface.
+
+Keeping game-data import and optimisation independent of WPF allows their behaviour to be exercised directly by `ColonyOptimizer.Tests`. The solution file is `ColonyOptimizer.slnx`; installer projects live separately under `installer`, and `scripts/Publish-Release.ps1` produces the distributable packages.
+
+Dependencies point inwards towards Core. Core must remain independent of game-data acquisition, optimisation, WPF, and application infrastructure; `ColonyOptimizer.GameData` and `ColonyOptimizer.Optimization` must remain usable without App.
+
+At runtime, the app loads game data into the Core model, applies plan and save selections, passes the resulting planning inputs to `ColonyOptimizer.Optimization`, then presents and persists the result. The visualisation receives a compact serialised projection of that result rather than direct access to the solver or game-data loader.
 
 ## Visualisation
 
-The optimiser emits `ProductionFlow` records for each allocated recipe input and output. The WPF view model serialises those records, the allocation-derived job-block count, and the node-layout settings into a compact node/link payload for the visualisation page. Its bundled D3 circular-Sankey renderer and ELK 0.12 layered node renderer both report DOM node/link counts back through WebView2 after each render. A non-empty optimisation is treated as a rendering failure if either count is zero. The node renderer uses ELK's Sugiyama-style `layered` algorithm with `RIGHT` or `DOWN` direction, polyline edge routing, configurable sibling-node spacing, and configurable layer spacing; ELK handles cycles during the initial layout. It renders recipe nodes in the application teal palette, directly connects balanced intermediate materials, and retains an item node only for a source deficit or genuine surplus. The visualisation owns pointer-capture pan, node drag, and non-passive wheel zoom handling. Edges remain direct when a node is moved, and their labels stay at the geometric centre of each arrow. The smoke check exercises graph navigation. Launch with `--visual-smoke` (or set `COLONY_OPTIMIZER_VISUAL_SMOKE_TEST=1`) to run the ten-wrought-iron-per-minute smoke optimisation with all progression enabled. This mode uses an isolated `%TEMP%` settings profile, validates installed-game icon assets plus both rendered graph DOMs, and exits with a nonzero code on failure. It writes a JSON completion marker to `%TEMP%\ColonyOptimizer\visual-smoke\result.json`, or to `COLONY_OPTIMIZER_SMOKE_RESULT_PATH` when supplied.
-
-The automated test suite also parses `MainWindow.xaml` and locks the Planner, Defence, Sources, and Visualisation row layouts. This catches accidental changes to a tab's available height before release.
+The optimiser emits `ProductionFlow` records for allocated recipe inputs and outputs. The WPF view model converts them, job-block counts, and layout settings into a compact serialised node/link projection for the offline WebView2 page. Bundled D3 circular-Sankey and ELK layered renderers handle cyclic graphs. Balanced intermediate materials are connected directly, while source deficits and genuine surpluses retain item nodes. Each renderer reports success or failure to WPF using its rendered DOM counts. Contributor-facing smoke and layout-regression checks are documented in `CONTRIBUTING.md`.
 
 ## Data ingestion
 
-The loader treats the manifest as authoritative and respects its integer ordering. It currently consumes `addOrReplaceNPCRecipes`, `addOrReplacePlayerRecipes`, `setToolsets`, `addScience`, `addNewTypes`, `addOrOverrideGrowableTypes`, `addOrOverrideAreaJobs`, and `generateBlocks`. Mineable types with `minerIsMineable`, `minerMiningTime`, and `onRemoveType` are normalised as miner recipes. Simple farm area jobs are combined with growable stages and final block drops to create crop source recipes. Generated blocks map crafting blocks, miners, and guards to their job and toolset definitions. Unknown JSON fields create a diagnostic rather than stopping the import.
+The loader treats the manifest as authoritative and respects its integer ordering. It combines recipe, item, job, science, toolset, timing, growable, and generated-block data into the Core model. Unknown JSON fields create a diagnostic rather than stopping the import. Exact operations and observed upstream fields are recorded in `GAME_DATA_VALIDATION.md`.
 
 The acquisition service checks common Steam locations, Steam library folders, and the standard Steam path on every ready drive. On first run it enumerates `world.sqlite3` files below each discovered `gamedata\savegames` directory. The selected save folder and last saved/opened plan path are persisted; the saved plan is applied after game data has been loaded on a subsequent launch. Direct folder and file selection remain available. The upstream GitHub source ZIP is cached in `%LOCALAPPDATA%\ColonyOptimizer\GameData\GitHub`.
 
 ## Timing and shifts
 
-`GameTiming` derives real cycle seconds as `24 * 60 * 60 / GameTimeScale`. Its interval helper works across midnight, so sleep, night guards, daylight, and hostile-period overlap use the loaded values rather than fixed vanilla constants. The default data currently yields 720 real seconds per full cycle and 444 worker-active seconds.
+`GameTiming` derives real cycle seconds as `24 * 60 * 60 / GameTimeScale`. Its interval helper works across midnight, so sleep, night guards, daylight, and hostile-period overlap use loaded values rather than hard-coded vanilla constants. Current validated values belong in `GAME_DATA_VALIDATION.md`.
 
 ## Tools and worker capacity
 
-Jobs inherit their toolset from generated block behaviour. For each toolset the optimiser selects the available usable tool with the largest parsed `craftingspeed`, combines it with the toolset `useMultiplier`, and applies it to each recipe cooldown. A stocked tool's durability is charged against that effective workload and its replacement rate joins the recurring material balance; the one-per-worker starter stock remains separately visible. A job capacity is worker-active milliseconds multiplied by efficiency and reduced by the requested headroom.
+`ColonyOptimizer.Optimization` derives recipe workload, shared worker capacity, and recurring tool replacement from the normalised job and tool data. The mathematical model is documented in `SOLVER_MODEL.md`.
 
 ## Persistence and diagnostics
 

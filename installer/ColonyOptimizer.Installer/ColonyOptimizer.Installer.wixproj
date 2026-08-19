@@ -1,0 +1,11 @@
+<Project Sdk="WixToolset.Sdk/5.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>ColonyOptimizer-$(Version)-win-x64</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <SuppressPdbOutput>true</SuppressPdbOutput>
+    <SuppressValidation>true</SuppressValidation>
+    <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\publish</PublishDirectory>
+    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);PublishDirectory=$(PublishDirectory)</DefineConstants>
+  </PropertyGroup>
+</Project>

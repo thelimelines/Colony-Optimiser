@@ -1,0 +1,22 @@
+# Build and test output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Oo]utputs/
+[Tt]est[Rr]esults/
+*.trx
+
+# Local game data and user plans
+work/
+*.colonyplan
+
+# IDE and operating-system state
+.vs/
+.idea/
+.tools/
+.tooling/
+*.user
+*.suo
+*.userosscache
+Thumbs.db
+Desktop.ini

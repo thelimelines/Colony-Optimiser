@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ColonyOptimizer.App/ColonyOptimizer.App.csproj" />
+    <Project Path="src/ColonyOptimizer.Core/ColonyOptimizer.Core.csproj" />
+    <Project Path="src/ColonyOptimizer.GameData/ColonyOptimizer.GameData.csproj" />
+    <Project Path="src/ColonyOptimizer.Optimization/ColonyOptimizer.Optimization.csproj" />
+  </Folder>
+  <Folder Name="/installer/">
+    <Project Path="installer/ColonyOptimizer.Installer/ColonyOptimizer.Installer.wixproj" />
+    <Project Path="installer/ColonyOptimizer.Setup/ColonyOptimizer.Setup.wixproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ColonyOptimizer.Tests/ColonyOptimizer.Tests.csproj" />
+  </Folder>
+</Solution>

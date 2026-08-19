@@ -1,0 +1,18 @@
+<Wix
+    xmlns="http://wixtoolset.org/schemas/v4/wxs"
+    xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle
+      Name="$(var.ProductDisplayName)"
+      Manufacturer="$(var.ProductPublisher)"
+      Version="$(var.Version)"
+      UpgradeCode="92E92929-141A-484D-B0B4-9B744B559F6C">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+          Theme="hyperlinkLicense"
+          LicenseUrl="https://opensource.org/license/mit/" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" />
+    </Chain>
+  </Bundle>
+</Wix>

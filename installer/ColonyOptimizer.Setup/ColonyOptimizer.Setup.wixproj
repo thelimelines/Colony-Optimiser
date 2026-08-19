@@ -1,0 +1,13 @@
+<Project Sdk="WixToolset.Sdk/5.0.0">
+  <ItemGroup>
+    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="5.0.0" />
+  </ItemGroup>
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <OutputName>ColonyOptimizer-$(Version)-Setup</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <SuppressPdbOutput>true</SuppressPdbOutput>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\ColonyOptimizer-$(Version)-win-x64.msi</MsiPath>
+    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);MsiPath=$(MsiPath)</DefineConstants>
+  </PropertyGroup>
+</Project>

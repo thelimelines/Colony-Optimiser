@@ -1,0 +1,875 @@
+<Window x:Class="ColonyOptimizer.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:core="clr-namespace:ColonyOptimizer.Core;assembly=ColonyOptimizer.Core" xmlns:local="clr-namespace:ColonyOptimizer.App" xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf" Title="Colony Optimiser" Icon="Assets/ColonyOptimizerLogo.ico" MinWidth="1120" MinHeight="700" Height="820" Width="1360" Background="#0D1518" Foreground="#F4FAF9" Loaded="Window_Loaded">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <local:IconPathToImageConverter x:Key="IconSourceConverter" />
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#244146" />
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="BorderBrush" Value="#7D9FA3" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="MinHeight" Value="30" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#31555A" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#16272A" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.52" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#087A67" />
+            <Setter Property="BorderBrush" Value="#6DE0C6" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#14967E" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="CogButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#E6F2F1" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="3" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="FontSize" Value="19" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="#72D5C5" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DangerIconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#FF7D76" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="16" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="#FFB4AD" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="Background" Value="#1B3034" />
+            <Setter Property="BorderBrush" Value="#7D9FA3" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="CaretBrush" Value="#FFFFFF" />
+            <Setter Property="SelectionBrush" Value="#237A70" />
+            <Setter Property="SelectionOpacity" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#6DE0C6" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Border" Property="Background" Value="#21373A" />
+                                <Setter Property="Foreground" Value="#BED1D2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="Background" Value="#1B3034" />
+            <Setter Property="BorderBrush" Value="#7D9FA3" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" Focusable="False" ClickMode="Press" Foreground="{TemplateBinding Foreground}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Padding="{TemplateBinding Padding}" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ToggleBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
+                                            <Grid>
+                                                <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" HorizontalAlignment="Left" TextElement.Foreground="{TemplateBinding Foreground}" Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}" ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                <Path Data="M 0 0 L 8 0 L 4 5 Z" Fill="#E3F0F0" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,9,0" />
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#72D5C5" />
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="#254146" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#6DE0C6" />
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="ToggleBorder" Property="Background" Value="#21373A" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" PopupAnimation="Fade">
+                                <Border MinWidth="{Binding ActualWidth, ElementName=ToggleButton}" MaxHeight="360" Background="#1A2D31" BorderBrush="#8AAEB1" BorderThickness="1" Padding="1">
+                                    <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="Background" Value="#1A2D31" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#256C66" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#087A67" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#A9C0C2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="#122125" />
+            <Setter Property="Foreground" Value="#F1F8F7" />
+            <Setter Property="BorderBrush" Value="#607E82" />
+            <Setter Property="RowBackground" Value="#14262A" />
+            <Setter Property="AlternatingRowBackground" Value="#192D31" />
+            <Setter Property="AlternationCount" Value="2" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="HorizontalGridLinesBrush" Value="#365156" />
+            <Setter Property="VerticalGridLinesBrush" Value="#365156" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="AutoGenerateColumns" Value="False" />
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#284247" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#607E82" />
+            <Setter Property="Padding" Value="7,5" />
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Foreground" Value="#F1F8F7" />
+            <Setter Property="BorderBrush" Value="#365156" />
+            <Setter Property="Padding" Value="5,3" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#116F68" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="Foreground" Value="#F1F8F7" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#116F68" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#CDE0E0" />
+            <Setter Property="Background" Value="#142327" />
+            <Setter Property="Padding" Value="15,11" />
+            <Setter Property="BorderBrush" Value="#547176" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#25615F" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#1F3F43" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55" /></Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="GroupBox">
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="BorderBrush" Value="#638286" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#F4FAF9" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <DataTemplate x:Key="ItemOptionTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="ToolTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="ItemNameTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="RecipeOutputTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding OutputIconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding OutputName}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="AmmoTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding AmmoIconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding Ammo}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="TrapAmmoTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding AmmunitionIconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding Ammunition}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="TrapNameTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="AllocationTemplate">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
+                <TextBlock Text="{Binding RecipeDisplayName}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="VisualGraphNodeTemplate">
+            <Border Width="180" Height="58" Background="{Binding Fill}" BorderBrush="{Binding Border}" BorderThickness="1" Padding="9" ToolTip="{Binding Label}">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Kind}" Foreground="#C6E7E4" FontSize="10" />
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="68" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="30" />
+        </Grid.RowDefinitions>
+        <Border Background="#14262A" BorderBrush="#547176" BorderThickness="0,0,0,1">
+            <Grid Margin="14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="/Assets/ColonyOptimizerLogo.png" Width="43" Height="43" Margin="0,0,11,0" />
+                    <StackPanel>
+                        <TextBlock Text="Colony Optimiser" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding TimingDisplay}" Foreground="#BCD4D5" FontSize="11" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="Plan" Foreground="#BDD4D5" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBox Width="220" Text="{Binding SelectedPlanName, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Content="New" Command="{Binding NewPlanCommand}" />
+                    <Button Content="Open" Command="{Binding OpenPlanCommand}" />
+                    <Button Content="Save" Command="{Binding SavePlanCommand}" />
+                    <Button Content="Save as" Command="{Binding SavePlanAsCommand}" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="Optimise" Command="{Binding OptimiseCommand}" />
+                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource CogButton}" Content="⚙" ToolTip="Settings" Command="{Binding OpenSettingsCommand}" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+        <Grid Grid.Row="1">
+            <TabControl x:Name="MainTabs" TabStripPlacement="Left" Background="#0D1518" BorderBrush="#405D62">
+                <TabItem Header="Planner">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="310" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,14">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Output search" Foreground="#D5E4E5" FontSize="12" />
+                            <TextBlock Grid.Column="1" Margin="10,0,0,0" Text="Target" Foreground="#D5E4E5" FontSize="12" />
+                            <TextBlock Grid.Column="2" Margin="10,0,0,0" Text="Unit" Foreground="#D5E4E5" FontSize="12" />
+                            <TextBox Grid.Row="1" Text="{Binding ItemSearch, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox Grid.Row="1" Grid.Column="1" Margin="10,0,0,0" Text="{Binding NewTargetAmount, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox Grid.Row="1" Grid.Column="2" Margin="10,0,0,0" ItemsSource="{Binding DemandUnits}" SelectedItem="{Binding NewTargetUnit}" />
+                            <Button Grid.Row="1" Grid.Column="3" Margin="10,0,0,0" Content="Add target" Command="{Binding AddTargetCommand}" />
+                            <ComboBox Grid.Row="2" Margin="0,4,0,0" ItemsSource="{Binding FilteredItems}" SelectedItem="{Binding SelectedItem}" IsDropDownOpen="{Binding IsItemSearchDropDownOpen, Mode=TwoWay}" ItemTemplate="{StaticResource ItemOptionTemplate}" />
+                        </Grid>
+                        <GroupBox Grid.Row="1" Header="Production targets">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Content="Clear" Command="{Binding ClearTargetsCommand}" />
+                                </StackPanel>
+                                <DataGrid ItemsSource="{Binding Targets}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Item" Width="*" IsReadOnly="True" CellTemplate="{StaticResource ItemNameTemplate}" />
+                                        <DataGridTextColumn Header="Amount" Binding="{Binding Amount, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:0.##}}" Width="100" />
+                                        <DataGridTemplateColumn Header="Unit" Width="120">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox ItemsSource="{Binding DataContext.DemandUnits, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding Unit}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Header="" Width="38">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource DangerIconButton}" Content="&#x2715;" ToolTip="Remove target" Command="{Binding DataContext.RemoveTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </GroupBox>
+                        <GroupBox Grid.Row="1" Grid.Column="1" Header="Externally supplied">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Bottom" Margin="0,10,0,0" Content="Add selected item" Command="{Binding AddExternalItemCommand}" />
+                                <DataGrid ItemsSource="{Binding ExternalItems}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Item" Width="*" IsReadOnly="True" CellTemplate="{StaticResource ItemNameTemplate}" />
+                                        <DataGridTemplateColumn Header="" Width="38">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource DangerIconButton}" Content="&#x2715;" ToolTip="Remove external item" Command="{Binding DataContext.RemoveExternalItemCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Progression">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="This plan can use only the sciences and tools selected below. Import a world save from Settings to populate both from your progression; tool selection controls worker speed and consumable replacements." Foreground="#D7E8E8" TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <GroupBox Header="Unlocked sciences">
+                                <DataGrid ItemsSource="{Binding ScienceRows}">
+                                    <DataGrid.Columns>
+                                        <DataGridCheckBoxColumn Header="Unlocked" Binding="{Binding IsSelected}" Width="85" />
+                                        <DataGridTextColumn Header="Science" Binding="{Binding DisplayName}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                            <GroupBox Grid.Column="1" Header="Available tools and consumables" Margin="12,0,0,12">
+                                <DataGrid ItemsSource="{Binding ToolRows}">
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSectionStart}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#7D9FA3" />
+                                                    <Setter Property="BorderThickness" Value="0,3,0,0" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                    <DataGrid.Columns>
+                                        <DataGridCheckBoxColumn Header="Use" Binding="{Binding IsSelected}" Width="55" />
+                                        <DataGridTemplateColumn Header="Tool" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource ToolTemplate}" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Sources">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Configure farm fields and forestry plots here. Crop cadence comes from the loaded growable stages; each tree occupies a 3 x 3 area." Foreground="#D9E8E9" TextWrapping="Wrap" Margin="0,0,0,12" />
+                        <GroupBox Grid.Row="1" Header="Area jobs">
+                            <DataGrid ItemsSource="{Binding AreaJobRows}">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="Area job" Width="*" IsReadOnly="True">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Image Source="{Binding IconPath}" Width="20" Height="20" Margin="0,0,7,0" />
+                                                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding AreaJobType}" Width="95" IsReadOnly="True" />
+                                    <DataGridTextColumn Header="Workers" Binding="{Binding WorkerCount, UpdateSourceTrigger=PropertyChanged}" Width="75" />
+                                    <DataGridTextColumn Header="Width" Binding="{Binding AreaWidth, UpdateSourceTrigger=PropertyChanged}" Width="65" />
+                                    <DataGridTextColumn Header="Length" Binding="{Binding AreaLength, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                                    <DataGridTextColumn Header="Area" Binding="{Binding AreaCapacity}" Width="95" IsReadOnly="True" />
+                                    <DataGridTextColumn Header="Cycle time" Binding="{Binding Cadence}" Width="165" IsReadOnly="True" />
+                                    <DataGridTextColumn Header="Output / cycle" Binding="{Binding OutputPerCycle}" Width="2*" IsReadOnly="True" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Defence">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Guard ammunition is included when you run Optimise. The current cycle and guard shifts are shown in the header and can be overridden in Settings." Foreground="#E1EEEE" />
+                        <TextBlock Grid.Row="1" Text="Entire shift assumes continuous fire. Hostile/dark uses darkness overlap. Custom utilisation and custom rounds override the normal estimate." Foreground="#C5D8D9" TextWrapping="Wrap" Margin="0,6,0,10" />
+                        <GroupBox Grid.Row="2" Header="Guards">
+                            <DataGrid ItemsSource="{Binding GuardRows}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Guard" Binding="{Binding DisplayName}" Width="*" />
+                                <DataGridTextColumn Header="Shift" Binding="{Binding Shift}" Width="120" />
+                                <DataGridTextColumn Header="Count" Binding="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                                <DataGridTemplateColumn Header="Ammo" Width="160" CellTemplate="{StaticResource AmmoTemplate}" />
+                                <DataGridTemplateColumn Header="Ammo model" Width="210">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox ItemsSource="{Binding DataContext.GuardAmmoModes, RelativeSource={RelativeSource AncestorType=Window}}" DisplayMemberPath="DisplayName" TextSearch.TextPath="DisplayName" SelectedValuePath="Value" SelectedValue="{Binding AmmoMode}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Use %" Width="70">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding UtilisationPercent, UpdateSourceTrigger=PropertyChanged}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                        <Setter Property="IsEnabled" Value="False" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding AmmoMode}" Value="{x:Static core:GuardAmmoMode.CustomUtilisation}">
+                                                                <Setter Property="IsEnabled" Value="True" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Custom rounds" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding CustomRoundsPerCycle, UpdateSourceTrigger=PropertyChanged}">
+                                                <TextBox.Style>
+                                                    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                        <Setter Property="IsEnabled" Value="False" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding AmmoMode}" Value="{x:Static core:GuardAmmoMode.CustomRoundsPerCycle}">
+                                                                <Setter Property="IsEnabled" Value="True" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBox.Style>
+                                            </TextBox>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="3" Header="Traps" Margin="0,12,0,0">
+                            <DataGrid ItemsSource="{Binding TrapRows}">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="Trap" Width="*" IsReadOnly="True" CellTemplate="{StaticResource TrapNameTemplate}" />
+                                    <DataGridTextColumn Header="Count" Binding="{Binding Count, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                    <DataGridTemplateColumn Header="Ammo" Width="*" IsReadOnly="True" CellTemplate="{StaticResource TrapAmmoTemplate}" />
+                                    <DataGridTextColumn Header="Full refill / cycle" Binding="{Binding FullReloadPerCycle}" Width="125" IsReadOnly="True" />
+                                    <DataGridTextColumn Header="Reload / round (s)" Binding="{Binding ReloadSecondsPerAmmunition, StringFormat={}{0:0.##}}" Width="125" IsReadOnly="True" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </GroupBox>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Recipes">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBox Width="440" HorizontalAlignment="Left" Text="{Binding RecipeSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search alternate recipes" />
+                        <DataGrid Grid.Row="1" Margin="0,12,0,0" ItemsSource="{Binding RecipeRows}">
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsVisible}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Produces" Width="*" CellTemplate="{StaticResource RecipeOutputTemplate}" />
+                                <DataGridTextColumn Header="Ingredients" Binding="{Binding Ingredients}" Width="2*" />
+                                <DataGridTemplateColumn Header="Rule" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ComboBox ItemsSource="{Binding DataContext.RecipePolicies, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding Policy}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Results">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Border Background="#1B383A" BorderBrush="#63C4B4" BorderThickness="1" Padding="16" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ResultHeadline}" FontSize="21" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                    <TextBlock Text="{Binding ResultDetail}" Foreground="#E0EEEE" TextWrapping="Wrap" Margin="0,5,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Copy summary" Command="{Binding CopySummaryCommand}" />
+                                    <Button Content="Export CSV" Command="{Binding ExportCsvCommand}" />
+                                    <Button Content="Export JSON" Command="{Binding ExportResultJsonCommand}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <GroupBox Header="Required jobs">
+                                <DataGrid ItemsSource="{Binding JobResults}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Job" Binding="{Binding JobDisplayName}" Width="*" />
+                                        <DataGridTextColumn Header="Workers" Binding="{Binding Workers}" Width="80" />
+                                        <DataGridTextColumn Header="Tool" Binding="{Binding SelectedToolDisplayName}" Width="*" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                            <GroupBox Grid.Column="1" Header="Total outputs" Margin="12,0,0,0">
+                                <DataGrid ItemsSource="{Binding OutputResults}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Item" Width="*" CellTemplate="{StaticResource ItemNameTemplate}" />
+                                        <DataGridTextColumn Header="Per cycle" Binding="{Binding PerCycle, StringFormat={}{0:0.##}}" Width="90" />
+                                        <DataGridTextColumn Header="Per minute" Binding="{Binding PerMinute, StringFormat={}{0:0.##}}" Width="90" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                        </Grid>
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <GroupBox Header="Recipe allocation">
+                                <DataGrid ItemsSource="{Binding AllocationResults}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Recipe" Width="*" CellTemplate="{StaticResource AllocationTemplate}" />
+                                        <DataGridTextColumn Header="Per cycle" Binding="{Binding CraftsPerCycle}" Width="90" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                            <GroupBox Grid.Column="1" Header="External requirements">
+                                <DataGrid ItemsSource="{Binding ExternalResults}">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Item" Width="*" CellTemplate="{StaticResource ItemNameTemplate}" />
+                                        <DataGridTextColumn Header="Per minute" Binding="{Binding PerMinute, StringFormat={}{0:0.##}}" Width="90" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </GroupBox>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Visualisation">
+                    <Grid Margin="18">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Margin="0,0,0,10">
+                            <TabControl Height="40" SelectedIndex="{Binding SelectedVisualisationIndex}">
+                                <TabItem Header="Sankey" />
+                                <TabItem Header="Node visualiser" />
+                            </TabControl>
+                            <Border Background="#14262A" BorderBrush="#547176" BorderThickness="1" Padding="10,7" Margin="0,8,0,0" Visibility="{Binding IsNodeVisualiserSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="20" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="46" />
+                                        <ColumnDefinition Width="20" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="46" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Direction" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding NodeLayoutDirections}" SelectedItem="{Binding NodeLayoutDirection}" />
+                                    <TextBlock Grid.Column="3" Text="Node spacing" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="4" Minimum="16" Maximum="160" Value="{Binding NodeSpacing}" TickFrequency="8" IsSnapToTickEnabled="True" />
+                                    <TextBox Grid.Column="5" Text="{Binding NodeSpacing, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
+                                    <TextBlock Grid.Column="7" Text="Layer spacing" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="8" Minimum="48" Maximum="240" Value="{Binding LayerSpacing}" TickFrequency="12" IsSnapToTickEnabled="True" />
+                                    <TextBox Grid.Column="9" Text="{Binding LayerSpacing, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                        <Border Grid.Row="1" Background="#102025" BorderBrush="#547176" BorderThickness="1">
+                            <wv2:WebView2 x:Name="SankeyWebView" />
+                        </Border>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+            <Border Panel.ZIndex="10" Background="#0D1518" Visibility="{Binding IsSettingsOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid Margin="24">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Settings" FontSize="25" FontWeight="SemiBold" />
+                            <TextBlock Text="Planning assumptions, save progression, game data, and diagnostics." Foreground="#C8DDDD" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Close settings" Command="{Binding CloseSettingsCommand}" VerticalAlignment="Center" />
+                    </Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,12,0">
+                                <GroupBox Header="Planning">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="84" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Production efficiency" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{Binding EfficiencyPercent, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
+                                        <Grid Margin="0,9,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="84" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Reserve spare capacity (%)" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{Binding HeadroomPercent, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
+                                        <Grid Margin="0,9,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="230" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Optimisation objective" VerticalAlignment="Center" />
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding OptimizationObjectives}" SelectedItem="{Binding SelectedObjective}" />
+                                        </Grid>
+                                        <Grid Margin="0,9,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="230" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Probabilistic outputs" VerticalAlignment="Center" />
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding StochasticPolicies}" SelectedItem="{Binding SelectedStochasticPolicy}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="Progression save">
+                                    <StackPanel>
+                                        <TextBlock Text="Select the world.sqlite3 file inside the Colony Survival save folder, then import it to set completed sciences and available tools. The app remembers the last save folder." Foreground="#D2E3E3" TextWrapping="Wrap" />
+                                <TextBox Text="{Binding LinkedSaveGameDisplay, Mode=OneWay}" IsReadOnly="True" Margin="0,10,0,0" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Button Style="{StaticResource PrimaryButton}" Content="Select world.sqlite3" Command="{Binding ChooseSaveGameCommand}" />
+                                            <Button Content="Import progression" Command="{Binding ImportLinkedSaveCommand}" />
+                                            <Button Content="Find worlds" Command="{Binding DiscoverWorldSavesCommand}" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding SaveImportStatus}" Foreground="#A9CCCC" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="Discovered worlds" Visibility="{Binding IsWorldSelectionOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <ComboBox ItemsSource="{Binding WorldSaveOptions}" SelectedItem="{Binding SelectedWorldSave}" />
+                                        <Button Style="{StaticResource PrimaryButton}" Content="Use selected world" Command="{Binding UseSelectedWorldSaveCommand}" Margin="0,10,0,0" />
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="Cycle timing">
+                                    <StackPanel>
+                                        <CheckBox Content="Override game timing" IsChecked="{Binding UseTimingOverride}" />
+                                        <TextBlock Text="{Binding TimingDisplay}" Foreground="#C5DADA" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="28" />
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="90" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Game scale" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="1" Text="{Binding GameTimeScale, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBlock Grid.Column="3" Text="Day starts" VerticalAlignment="Center" />
+                                            <TextBox Grid.Column="4" Text="{Binding DayTimeStart, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBlock Grid.Row="1" Text="Day ends" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DayTimeEnd, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="1" Grid.Column="3" Text="Work starts" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="1" Grid.Column="4" Text="{Binding SleepTimeEnd, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="2" Text="Work ends" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SleepTimeStart, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="2" Grid.Column="3" Text="Day guard start" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="2" Grid.Column="4" Text="{Binding GuardShiftDayStart, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="3" Text="Day guard end" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding GuardShiftDayEnd, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="3" Grid.Column="3" Text="Night guard start" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="3" Grid.Column="4" Text="{Binding GuardShiftNightStart, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                            <TextBlock Grid.Row="4" Text="Night guard end" VerticalAlignment="Center" Margin="0,8,0,0" />
+                                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding GuardShiftNightEnd, UpdateSourceTrigger=PropertyChanged}" Margin="0,8,0,0" />
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <GroupBox Header="Game data">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DataSourceDisplay}" Foreground="#CDE1E1" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                            <Button Style="{StaticResource PrimaryButton}" Content="Download latest public data" Command="{Binding DownloadLatestDataCommand}" />
+                                            <Button Content="Change directory" Command="{Binding ChooseDataDirectoryCommand}" />
+                                            <Button Content="Reload" Command="{Binding LoadDataCommand}" />
+                                        </StackPanel>
+                                        <TextBox Text="{Binding DataDirectory, UpdateSourceTrigger=PropertyChanged}" Margin="0,10,0,0" />
+                                    </StackPanel>
+                                </GroupBox>
+                                <GroupBox Header="Diagnostics">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Bottom" Content="Copy diagnostics" Command="{Binding CopyDiagnosticsCommand}" Margin="0,10,0,0" />
+                                        <TextBox Text="{Binding DiagnosticsText}" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" Height="260" />
+                                    </DockPanel>
+                                </GroupBox>
+                                <GroupBox Header="Recent plans">
+                                    <ListBox ItemsSource="{Binding RecentPlans}" BorderThickness="0" Background="Transparent">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Content="{Binding}" HorizontalContentAlignment="Left" Command="{Binding DataContext.OpenRecentPlanCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </GroupBox>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+        <Grid Grid.Row="2" Background="#14262A">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="12,0" Foreground="#D9E7E8" />
+            <TextBlock Grid.Column="1" Text="{x:Static local:AppVersion.DisplayWithPrefix}" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#B7CED0" />
+        </Grid>
+    </Grid>
+</Window>

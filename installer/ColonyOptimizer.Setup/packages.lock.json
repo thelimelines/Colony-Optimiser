@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "native,Version=v0.0": {
+      "WixToolset.BootstrapperApplications.wixext": {
+        "type": "Direct",
+        "requested": "[5.0.0, )",
+        "resolved": "5.0.0",
+        "contentHash": "Ixcm845QNZjQoSDM7Hnj60/S21HTotKKre5batp0Tu6Zz3IeDRbe0GOssWhqYK4XEy7dfbfUNHEphYkERoKbdw=="
+      }
+    }
+  }
+}

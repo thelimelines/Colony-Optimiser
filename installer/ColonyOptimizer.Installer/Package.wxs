@@ -1,0 +1,36 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="$(var.ProductDisplayName)"
+      Manufacturer="$(var.ProductPublisher)"
+      Version="$(var.Version)"
+      UpgradeCode="5BD10B0E-ED5F-4DCB-9D41-4D07AFA4900D"
+      Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="$(var.ProductDisplayName)" />
+    </StandardDirectory>
+    <Files Directory="INSTALLFOLDER" Include="$(var.PublishDirectory)\**" />
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ColonyOptimiserStartMenu" Name="$(var.ProductDisplayName)">
+        <Component Id="StartMenuShortcut" Guid="EDC46B60-D4FB-47E1-8B7A-52E7EEEBF3EF">
+          <Shortcut
+              Id="StartMenuShortcutLink"
+              Name="$(var.ProductDisplayName)"
+              Target="[INSTALLFOLDER]ColonyOptimizer.exe"
+              WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveStartMenuFolder" On="uninstall" />
+          <RegistryValue
+              Root="HKLM"
+              Key="Software\ColonyOptimiser"
+              Name="StartMenuShortcut"
+              Type="integer"
+              Value="1"
+              KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+  </Package>
+</Wix>

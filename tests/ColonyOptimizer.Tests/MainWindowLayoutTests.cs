@@ -77,6 +77,8 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("COLONY_OPTIMIZER_SMOKE_RESULT_PATH", source, StringComparison.Ordinal);
         Assert.Contains("WriteVisualisationSmokeResult(succeeded)", source, StringComparison.Ordinal);
         Assert.Contains("MainTabs.SelectedIndex = 6", source, StringComparison.Ordinal);
+        Assert.Contains("Environment.SpecialFolder.LocalApplicationData", source, StringComparison.Ordinal);
+        Assert.Contains("MicrosoftEdgeWebView2RuntimeInstallerX64.exe", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -113,11 +115,16 @@ public sealed class MainWindowLayoutTests
         var readme = File.ReadAllText(Path.Combine(repository, "README.md"));
         var script = File.ReadAllText(Path.Combine(repository, "scripts", "Publish-Release.ps1"));
         var workflow = File.ReadAllText(Path.Combine(repository, ".github", "workflows", "release.yml"));
+        var bundle = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "Bundle.wxs"));
 
         Assert.Contains("-Setup.exe", readme, StringComparison.Ordinal);
         Assert.Contains("-win-x64.msi", readme, StringComparison.Ordinal);
         Assert.Contains("ColonyOptimizer.Installer.wixproj", script, StringComparison.Ordinal);
         Assert.Contains("ColonyOptimizer.Setup.wixproj", script, StringComparison.Ordinal);
+        Assert.Contains("Get-WebView2RuntimeInstaller", script, StringComparison.Ordinal);
+        Assert.Contains("MicrosoftEdgeWebView2RuntimeInstallerX64.exe", script, StringComparison.Ordinal);
+        Assert.Contains("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
+        Assert.Contains("DetectCondition=\"WebView2RuntimeMachineVersion OR WebView2RuntimeUserVersion\"", bundle, StringComparison.Ordinal);
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
     }
 

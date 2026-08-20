@@ -27,6 +27,8 @@ $archivePath = Join-Path $artifactRoot "$packageName.zip"
 $msiPath = Join-Path $artifactRoot "$packageName.msi"
 $setupPath = Join-Path $artifactRoot "ColonyOptimizer-$normalizedVersion-Setup.exe"
 $assetsPath = Join-Path (Split-Path -Parent $projectPath) "obj\project.assets.json"
+$webViewRuntimeInstallerPath = Join-Path $publishDirectory "Dependencies\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
+$webViewRuntimeInstallerUri = "https://go.microsoft.com/fwlink/p/?LinkId=2124701"
 
 function Get-ResolvedPackagePath {
     param(
@@ -83,6 +85,21 @@ function Copy-ReleaseNotice {
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
 
+function Get-WebView2RuntimeInstaller {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Destination
+    )
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Invoke-WebRequest -Uri $webViewRuntimeInstallerUri -OutFile $Destination
+
+    $signature = Get-AuthenticodeSignature -FilePath $Destination
+    if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {
+        throw "The downloaded WebView2 Runtime installer did not have a valid Microsoft Corporation signature."
+    }
+}
+
 if ((Test-Path $publishDirectory) -or (Test-Path $archivePath) -or (Test-Path $msiPath) -or (Test-Path $setupPath)) {
     throw "Release artifacts for $normalizedVersion already exist. Use a clean workspace or a new version."
 }
@@ -102,6 +119,11 @@ dotnet publish $projectPath `
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }
+
+# The standalone installer keeps the MSI, Setup EXE, and portable ZIP usable on
+# Windows images that do not include the WebView2 Runtime. The Setup EXE runs it
+# before the MSI; the app can run the same bundled installer for MSI/ZIP installs.
+Get-WebView2RuntimeInstaller -Destination $webViewRuntimeInstallerPath
 
 if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
     throw "NuGet assets file was not found: $assetsPath"
@@ -144,7 +166,8 @@ dotnet build $setupProjectPath `
     --no-restore `
     --output $artifactRoot `
     "-p:Version=$normalizedVersion" `
-    "-p:MsiPath=$msiPath"
+    "-p:MsiPath=$msiPath" `
+    "-p:WebView2RuntimeInstallerPath=$webViewRuntimeInstallerPath"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Setup EXE build failed with exit code $LASTEXITCODE."

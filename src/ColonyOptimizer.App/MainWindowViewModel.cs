@@ -474,6 +474,15 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    public void ReportVisualisationRuntimeInstallationStarted() =>
+        StatusText = "Installing the Microsoft Edge WebView2 Runtime for visualisation...";
+
+    public void ReportVisualisationRuntimeInstalled() =>
+        StatusText = "Microsoft Edge WebView2 Runtime installed; visualisation is ready";
+
+    public void ReportVisualisationRuntimeUnavailable() =>
+        StatusText = "Visualisation requires the Microsoft Edge WebView2 Runtime. Re-run the installer or install it from Microsoft.";
+
     [RelayCommand]
     private async Task SavePlanAsync()
     {

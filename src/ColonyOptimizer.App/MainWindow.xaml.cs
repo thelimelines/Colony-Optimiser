@@ -1,7 +1,9 @@
 using System.Windows;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using Microsoft.Web.WebView2.Core;
 
 namespace ColonyOptimizer.App;
 
@@ -30,12 +32,75 @@ public partial class MainWindow : Window
         try
         {
             SankeyWebView.NavigationCompleted += SankeyWebViewOnNavigationCompleted;
-            await SankeyWebView.EnsureCoreWebView2Async();
-            SankeyWebView.Source = new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Visualisation", "Sankey.html"));
+            await InitialiseVisualisationWebViewAsync();
         }
         catch (Exception exception)
         {
             FileLogger.Write(exception, "visualisation-webview");
+            _viewModel.ReportVisualisationRuntimeUnavailable();
+
+            if (await InstallBundledWebViewRuntimeAsync())
+            {
+                try
+                {
+                    await InitialiseVisualisationWebViewAsync();
+                    _viewModel.ReportVisualisationRuntimeInstalled();
+                    return;
+                }
+                catch (Exception retryException)
+                {
+                    FileLogger.Write(retryException, "visualisation-webview-retry");
+                }
+            }
+
+            _viewModel.ReportVisualisationRuntimeUnavailable();
+        }
+    }
+
+    private async Task InitialiseVisualisationWebViewAsync()
+    {
+        // The default WebView2 profile is created beside the executable. That location is
+        // read-only for a normal user when the MSI or Setup EXE installs to Program Files.
+        var userDataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ColonyOptimizer",
+            "WebView2");
+        Directory.CreateDirectory(userDataDirectory);
+        var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDirectory);
+        await SankeyWebView.EnsureCoreWebView2Async(environment);
+        SankeyWebView.Source = new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Visualisation", "Sankey.html"));
+    }
+
+    private async Task<bool> InstallBundledWebViewRuntimeAsync()
+    {
+        var installerPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Dependencies",
+            "MicrosoftEdgeWebView2RuntimeInstallerX64.exe");
+        if (!File.Exists(installerPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            _viewModel.ReportVisualisationRuntimeInstallationStarted();
+            using var installer = Process.Start(new ProcessStartInfo(installerPath, "/silent /install")
+            {
+                UseShellExecute = true,
+            });
+            if (installer is null)
+            {
+                return false;
+            }
+
+            await installer.WaitForExitAsync();
+            return installer.ExitCode is 0 or 3010;
+        }
+        catch (Exception exception)
+        {
+            FileLogger.Write(exception, "visualisation-runtime-install");
+            return false;
         }
     }
 

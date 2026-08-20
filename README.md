@@ -26,7 +26,7 @@ It is an independent community project and is not affiliated with Pipliz.
 4. We recommend downloading the matching `.sha256` file for the chosen asset. Do not download the automatically generated `Source code` archives.
 5. Run the setup program or MSI. For the portable ZIP, extract it somewhere you can write to and run `ColonyOptimizer.exe`.
 
-The download includes the .NET runtime for 64-bit Windows 10 or 11, so .NET, Python, and Steam do not need to be installed separately. The Visualisation tab uses the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/), which is included with Windows 11 and most supported Windows 10 installations but may need to be installed separately on uncommon or managed Windows images. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page. Check the accompanying checksum if you want to confirm that the download arrived unchanged.
+The download includes the .NET runtime and the Microsoft Edge WebView2 Runtime for 64-bit Windows 10 or 11, so .NET, Python, Steam, and WebView2 do not need to be installed separately. The Setup EXE installs WebView2 before Colony Optimiser. MSI and portable installs carry the same Microsoft installer and repair the prerequisite automatically on first launch if necessary. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page. Check the accompanying checksum if you want to confirm that the download arrived unchanged.
 
 ### Check the download (OPTIONAL)
 

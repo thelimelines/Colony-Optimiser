@@ -71,6 +71,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
         Assert.Contains("CropFarmLayouts", viewModel, StringComparison.Ordinal);
         Assert.Contains("TrapRows.ToList().ForEach(row => row.Count = 0)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Targets.Count == 0 && GuardRows.All(row => row.Count == 0) && TrapRows.All(row => row.Count == 0)", viewModel, StringComparison.Ordinal);
         Assert.Contains("result.IsOptimal", viewModel, StringComparison.Ordinal);
     }
 

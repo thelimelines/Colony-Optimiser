@@ -46,7 +46,7 @@ To obtain recipe data, open the settings cog and either select your installed Co
 
 To create a plan:
 
-1. In **Planner**, choose an output, enter an amount and unit, then add it to the plan.
+1. In **Planner**, choose an output, enter an amount and unit, then add it to the plan. A guard or trap requirement can also be optimised on its own.
 2. Set sciences, tools, area-job capacity, defence, and recipe choices as required.
 3. Select **Optimise**.
 4. Review jobs, inputs, tools, and total outputs in **Results**. The **Visualisation** tab provides an interactive Sankey and node graph; drag empty space to pan, drag nodes to arrange them, and use the mouse wheel to zoom. In **Node visualiser**, choose a rightward or downward layout and tune node and layer spacing. Recipe nodes show their required job-block count; balanced intermediate items are collapsed, while genuine surplus remains visible as an output node.

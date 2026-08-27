@@ -20,7 +20,7 @@ public sealed class ProductionOptimizer
             .Concat(BuildCropFarmRecipes(database, plan, timing))
             .Concat(BuildForestryRecipes(database, plan, timing))
             .ToArray();
-        var eligibility = DetermineEligibleRecipes(database, plan, availableRecipes);
+        var eligibility = DetermineEligibleRecipes(plan, availableRecipes);
         var externalItems = DetermineEffectiveExternalItems(plan, availableRecipes);
         var result = new OptimizationResult { Demand = demand };
         result.Messages.AddRange(eligibility.Messages);
@@ -59,6 +59,21 @@ public sealed class ProductionOptimizer
             model,
             jobBlockVariables.Where(entry => jobCapacities[entry.Key].IsAutomatedQueue).Select(entry => entry.Value),
             jobBlockVariables.Where(entry => jobCapacities[entry.Key].IsAutomatedQueue).Select(_ => 1L));
+        var workerRecipeOutputs = eligibility.Recipes
+            .Where(recipe => !jobCapacities[recipe.JobTypeId].IsAutomatedQueue)
+            .SelectMany(recipe => recipe.Outputs)
+            .Select(output => output.ItemId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var automatedFallbackRecipes = eligibility.Recipes
+            .Where(recipe =>
+                jobCapacities[recipe.JobTypeId].IsAutomatedQueue &&
+                plan.RecipePolicies.GetValueOrDefault(recipe.Id) is not RecipePolicy.Preferred and not RecipePolicy.Forced &&
+                recipe.Outputs.All(output => workerRecipeOutputs.Contains(output.ItemId)))
+            .ToArray();
+        var automatedFallbackPenalty = CreateMetric(
+            model,
+            automatedFallbackRecipes.Select(recipe => craftVariables[recipe.Id]),
+            automatedFallbackRecipes.Select(_ => 1L));
         var preferencePenalty = CreateMetric(
             model,
             craftVariables.Where(entry => plan.RecipePolicies.GetValueOrDefault(entry.Key) != RecipePolicy.Preferred && plan.RecipePolicies.GetValueOrDefault(entry.Key) != RecipePolicy.Forced).Select(entry => entry.Value),
@@ -82,7 +97,7 @@ public sealed class ProductionOptimizer
 
         var solver = new CpSolver { StringParameters = "max_time_in_seconds: 20 num_search_workers: 8" };
         using var cancellationRegistration = cancellationToken.Register(solver.StopSearch);
-        var status = SolveLexicographically(model, solver, settings.Objective, totalWorkers, totalMachineBlocks, preferencePenalty, rawConsumption, workload);
+        var status = SolveLexicographically(model, solver, settings.Objective, automatedFallbackPenalty, totalWorkers, totalMachineBlocks, preferencePenalty, rawConsumption, workload);
         result.SolverStatus = status.ToString();
         result.IsOptimal = status == CpSolverStatus.Optimal;
         if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
@@ -220,7 +235,7 @@ public sealed class ProductionOptimizer
         }
     }
 
-    private static RecipeEligibility DetermineEligibleRecipes(GameDatabase database, ProductionPlan plan, IReadOnlyCollection<RecipeDefinition> availableRecipes)
+    private static RecipeEligibility DetermineEligibleRecipes(ProductionPlan plan, IReadOnlyCollection<RecipeDefinition> availableRecipes)
     {
         var messages = new List<OptimizationMessage>();
         var forcedOutputs = availableRecipes
@@ -256,18 +271,6 @@ public sealed class ProductionOptimizer
             eligible.Add(recipe);
         }
 
-        // Queued machines are useful fallbacks, but a worker recipe is the normal colony-production
-        // choice whenever it can make the same outputs. Explicitly forced machine recipes still win.
-        var workerOutputs = eligible
-            .Where(recipe => !IsAutomatedQueue(database, recipe))
-            .SelectMany(recipe => recipe.Outputs)
-            .Select(output => output.ItemId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        eligible.RemoveAll(recipe =>
-            IsAutomatedQueue(database, recipe) &&
-            plan.RecipePolicies.GetValueOrDefault(recipe.Id) != RecipePolicy.Forced &&
-            recipe.Outputs.All(output => workerOutputs.Contains(output.ItemId)));
-
         foreach (var output in forcedOutputs)
         {
             if (!eligible.Any(recipe => recipe.Outputs.Any(amount => amount.ItemId.Equals(output, StringComparison.OrdinalIgnoreCase))))
@@ -278,9 +281,6 @@ public sealed class ProductionOptimizer
 
         return new RecipeEligibility(eligible, messages);
     }
-
-    private static bool IsAutomatedQueue(GameDatabase database, RecipeDefinition recipe) => database.Jobs
-        .FirstOrDefault(job => job.Id.Equals(recipe.JobTypeId, StringComparison.OrdinalIgnoreCase))?.IsAutomatedQueue == true;
 
     private static int CalculateGuardShots(GameTiming timing, GuardTypeDefinition guard, GuardAmmoMode mode, decimal utilisationPercent, int? customRoundsPerCycle)
     {
@@ -434,13 +434,13 @@ public sealed class ProductionOptimizer
             job?.IsAutomatedQueue ?? false);
     }
 
-    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
+    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric automatedFallbacks, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
     {
         var order = objective == OptimizationObjective.PreferredRecipesFirst
-            ? new[] { preferences, totalWorkers, totalMachineBlocks, workload }
+            ? new[] { preferences, automatedFallbacks, totalWorkers, totalMachineBlocks, workload }
             : objective == OptimizationObjective.LowestRawResourceConsumption
-                ? new[] { rawConsumption, totalWorkers, totalMachineBlocks, preferences, workload }
-                : new[] { totalWorkers, totalMachineBlocks, preferences, workload };
+                ? new[] { rawConsumption, automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload }
+                : new[] { automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload };
 
         CpSolverStatus status = CpSolverStatus.Unknown;
         foreach (var metric in order)

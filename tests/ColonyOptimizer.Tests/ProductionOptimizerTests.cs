@@ -71,7 +71,7 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void uses_an_automated_queue_only_when_no_worker_recipe_is_available()
+    public void prefers_a_worker_recipe_when_an_automated_queue_can_produce_the_same_output()
     {
         var database = CreateDatabase(activeSeconds: 100m);
         database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
@@ -83,6 +83,32 @@ public sealed class ProductionOptimizerTests
         Assert.True(result.IsFeasible);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
         Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
+    }
+
+    [Fact]
+    public void uses_an_automated_queue_when_the_worker_route_cannot_supply_its_input()
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        var workerRecipe = Recipe("worker-widget", "worker", 100m, "widget");
+        workerRecipe.Inputs.Add(new ItemAmount("manual-input", 1m));
+        database.Recipes.Add(workerRecipe);
+        database.Recipes.Add(Recipe("machine-widget", "machine", 1m, "widget"));
+        database.Recipes.Add(new RecipeDefinition
+        {
+            Id = "locked-manual-input",
+            DisplayName = "Locked Manual Input",
+            JobTypeId = "worker",
+            CooldownSeconds = 1m,
+            RequiredScience = "unavailable-science",
+            Outputs = { new ItemAmount("manual-input", 1m) }
+        });
+
+        var result = new ProductionOptimizer().Optimize(database, Plan(("widget", 1m)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Messages.Select(message => message.Text)));
+        Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
+        Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
     }
 
     [Theory]
@@ -555,7 +581,10 @@ public sealed class ProductionOptimizerTests
         Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Messages.Select(message => message.Text)));
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == recipe.Id && allocation.IsAutomatedQueue);
-        Assert.DoesNotContain(result.JobRequirements, job => job.JobTypeId == "pipliz.odditypress");
+        var machine = Assert.Single(result.JobRequirements, job => job.JobTypeId == "pipliz.odditypress");
+        Assert.True(machine.IsAutomatedQueue);
+        Assert.Equal(0, machine.Workers);
+        Assert.True(machine.MachineBlocks > 0);
     }
 
     [Fact]

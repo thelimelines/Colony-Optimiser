@@ -411,9 +411,9 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        if (Targets.Count == 0 && GuardRows.All(row => row.Count == 0))
+        if (Targets.Count == 0 && GuardRows.All(row => row.Count == 0) && TrapRows.All(row => row.Count == 0))
         {
-            ShowError("Add at least one production target or guard requirement.");
+            ShowError("Add at least one production target, guard requirement, or trap requirement.");
             return;
         }
 

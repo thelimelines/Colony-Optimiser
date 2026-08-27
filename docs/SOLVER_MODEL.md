@@ -10,7 +10,7 @@ The optimiser builds its feasible recipe set before constructing constraints:
 - forbidden recipes and recipes needing locked science are excluded;
 - forcing a recipe excludes other recipes that produce the same output;
 - if no forced recipe for a forced output remains eligible, the optimiser produces an error;
-- an automated queue is a fallback and is excluded when an eligible worker recipe produces all the same outputs, unless the queue recipe is forced; and
+- an automated queue remains available when an eligible worker recipe produces all the same outputs. Its crafts are deprioritised as fallbacks unless the queue recipe is preferred or forced; and
 - preferred recipes remain feasible alternatives but receive a lower penalty in the preference objective.
 
 Automatic external-source detection examines parsed non-player producers before these eligibility filters. An input is automatic external material only when it has no parsed non-player producer at all. A science-gated, forbidden, or displaced producer therefore does not silently turn its output into an external source; the optimiser reports why the requested item cannot currently be produced.
@@ -39,7 +39,7 @@ Entire-shift mode uses the loaded duration of the guard's day or night shift. Ho
 
 Rounds are multiplied by the guard count and each ammunition requirement, then added to ordinary player demand before the material-balance constraints are created. Trap assignments similarly add one configured full refill per trap per cycle.
 
-## Worker capacity
+## Job-block capacity
 
 For every job type `j`:
 
@@ -48,7 +48,7 @@ sum_(r assigned to j) C_r * effectiveWorkload(r)
     <= N_j * availableWorkerMilliseconds
 ```
 
-Available worker time is the job's active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before worker count is chosen. Dedicated farm or forestry crafts also reserve their required workers explicitly.
+Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle and are counted as machine blocks rather than workers. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Dedicated farm or forestry crafts also reserve their required workers explicitly.
 
 Simple crop farms are modelled as dedicated farm areas. Their growable stages advance once per night, so an `n`-stage crop has a growth period of `n - 1` full game cycles. Each configured field produces its harvested-tile count divided by that period; one farmer is reserved for the area. The crop source tab records field tile counts, growth, science, and expected output per game cycle.
 
@@ -64,11 +64,12 @@ Craft and worker counts remain integers and are not rounded after solving. Displ
 
 The default lexicographic objective is:
 
-1. minimise total `sum_j N_j`;
-2. minimise non-preferred craft count while retaining that worker minimum; and
-3. minimise total worker milliseconds.
+1. minimise crafts from automated queues that have an ordinary worker-recipe alternative;
+2. minimise worker blocks, then automated machine blocks;
+3. minimise non-preferred craft count while retaining those block minima; and
+4. minimise total worker or machine milliseconds.
 
-Preferred-recipes-first swaps the first two priorities. Lowest-raw-resource-consumption first minimises inputs with no enabled producer, then workers, preferences, and workload. It does not invent gathering rates.
+Preferred-recipes-first first minimises non-preferred crafts, then automated fallbacks, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption first minimises inputs with no enabled producer, then automated fallbacks, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
 
 ## External materials
 

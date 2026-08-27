@@ -67,6 +67,7 @@ public sealed class ProductionOptimizer
         var automatedFallbackRecipes = eligibility.Recipes
             .Where(recipe =>
                 jobCapacities[recipe.JobTypeId].IsAutomatedQueue &&
+                jobCapacities[recipe.JobTypeId].IsSingleBlock &&
                 plan.RecipePolicies.GetValueOrDefault(recipe.Id) is not RecipePolicy.Preferred and not RecipePolicy.Forced &&
                 recipe.Outputs.All(output => workerRecipeOutputs.Contains(output.ItemId)))
             .ToArray();
@@ -420,10 +421,7 @@ public sealed class ProductionOptimizer
     {
         var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(jobTypeId, StringComparison.OrdinalIgnoreCase));
         var isAutomatedQueue = job?.IsAutomatedQueue ?? false;
-        // The game's autocrafter is a single shared queue.  Keep the flag
-        // explicit on the domain model so other single-block jobs can be
-        // represented without treating them as automated queues.
-        var isSingleBlock = isAutomatedQueue || job?.IsSingleBlock == true;
+        var isSingleBlock = job?.IsSingleBlock ?? false;
         // Queued machines run for the whole game cycle; worker-active time applies
         // only to colonists operating a job block.
         var activeSeconds = isAutomatedQueue

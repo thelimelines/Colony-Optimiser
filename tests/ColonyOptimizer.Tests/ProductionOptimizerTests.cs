@@ -74,10 +74,10 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void avoids_an_automated_fallback_when_a_worker_recipe_can_meet_demand()
+    public void avoids_the_unique_autocrafter_when_a_worker_recipe_can_meet_demand()
     {
         var database = CreateDatabase(activeSeconds: 100m);
-        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Autocrafter", IsAutomatedQueue = true, IsSingleBlock = true });
         database.Recipes.Add(Recipe("worker-widget", "worker", 100m, "widget"));
         database.Recipes.Add(Recipe("machine-widget", "machine", 1m, "widget"));
 
@@ -87,6 +87,22 @@ public sealed class ProductionOptimizerTests
         Assert.Equal(1, result.TotalWorkers);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
         Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
+    }
+
+    [Fact]
+    public void treats_a_repeatable_queued_machine_as_a_normal_production_option()
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "oddity-press", DisplayName = "Oddity Press", IsAutomatedQueue = true });
+        database.Recipes.Add(Recipe("worker-widget", "worker", 100m, "widget"));
+        database.Recipes.Add(Recipe("oddity-widget", "oddity-press", 1m, "widget"));
+
+        var result = new ProductionOptimizer().Optimize(database, Plan(("widget", 1m)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(0, result.TotalWorkers);
+        Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "oddity-widget");
+        Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
     }
 
     [Fact]
@@ -119,10 +135,10 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void preferred_recipes_first_uses_a_worker_recipe_when_an_automated_queue_is_only_a_fallback()
+    public void preferred_recipes_first_uses_a_worker_recipe_when_the_unique_autocrafter_is_only_a_fallback()
     {
         var database = CreateDatabase(activeSeconds: 100m);
-        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Autocrafter", IsAutomatedQueue = true, IsSingleBlock = true });
         database.Recipes.Add(Recipe("worker-widget", "worker", 100m, "widget"));
         database.Recipes.Add(Recipe("machine-widget", "machine", 1m, "widget"));
 
@@ -137,10 +153,10 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void uses_an_automated_queue_when_the_worker_route_cannot_supply_its_input()
+    public void uses_the_unique_autocrafter_when_the_worker_route_cannot_supply_its_input()
     {
         var database = CreateDatabase(activeSeconds: 100m);
-        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Autocrafter", IsAutomatedQueue = true, IsSingleBlock = true });
         var workerRecipe = Recipe("worker-widget", "worker", 100m, "widget");
         workerRecipe.Inputs.Add(new ItemAmount("manual-input", 1m));
         database.Recipes.Add(workerRecipe);
@@ -166,10 +182,10 @@ public sealed class ProductionOptimizerTests
     [InlineData(72, true)]
     [InlineData(73, false)]
     [InlineData(720, false)]
-    public void limits_an_automated_queue_to_its_single_machine_block(decimal demand, bool isFeasible)
+    public void limits_the_unique_autocrafter_to_its_single_machine_block(decimal demand, bool isFeasible)
     {
         var database = CreateDatabase(activeSeconds: 100m);
-        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Autocrafter", IsAutomatedQueue = true, IsSingleBlock = true });
         database.Recipes.Add(Recipe("machine-widget", "machine", 10m, "widget"));
 
         var result = new ProductionOptimizer().Optimize(database, Plan(("widget", demand)), new OptimizationSettings());
@@ -187,6 +203,20 @@ public sealed class ProductionOptimizerTests
         Assert.True(machine.IsAutomatedQueue);
         Assert.Equal(0, machine.Workers);
         Assert.Equal(1, machine.MachineBlocks);
+    }
+
+    [Fact]
+    public void allows_multiple_blocks_for_a_repeatable_queued_machine()
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "oddity-press", DisplayName = "Oddity Press", IsAutomatedQueue = true });
+        database.Recipes.Add(Recipe("oddity-widget", "oddity-press", 10m, "widget"));
+
+        var result = new ProductionOptimizer().Optimize(database, Plan(("widget", 73m)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(2, result.TotalMachineBlocks);
+        Assert.Equal(2, Assert.Single(result.JobRequirements).MachineBlocks);
     }
 
     [Fact]
@@ -741,7 +771,8 @@ public sealed class ProductionOptimizerTests
 
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.tailor" && job.ToolsetId == "default");
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.cook" && job.ToolsetId == "default");
-        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue && job.IsSingleBlock && job.ToolsetId is null);
+        Assert.Contains(database.Jobs, job => job.Id == "pipliz.autocrafter" && job.IsAutomatedQueue && job.IsSingleBlock && job.ToolsetId is null);
+        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue && !job.IsSingleBlock && job.ToolsetId is null);
     }
 
     [Fact]
@@ -755,7 +786,7 @@ public sealed class ProductionOptimizerTests
         var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
 
         Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Messages.Select(message => message.Text)));
-        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue);
+        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue && !job.IsSingleBlock);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == recipe.Id && allocation.IsAutomatedQueue);
         var machine = Assert.Single(result.JobRequirements, job => job.JobTypeId == "pipliz.odditypress");
         Assert.True(machine.IsAutomatedQueue);

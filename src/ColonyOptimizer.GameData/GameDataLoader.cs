@@ -563,6 +563,12 @@ public sealed class GameDataLoader
                     continue;
                 }
 
+                // Both the unique Autocrafter and repeatable machines such as the
+                // Oddity Press use the autocrafter behaviour.  Its allowMultiple
+                // setting distinguishes the single shared queue from machines the
+                // colony can build more than once.
+                var isSingleBlock = isAutomatedQueue && !GetBoolean(behaviour, "allowMultiple", true);
+
                 var npcType = GetString(behaviour, "npcType");
                 if (string.IsNullOrEmpty(npcType))
                 {
@@ -573,7 +579,7 @@ public sealed class GameDataLoader
                 {
                     // Manual crafting blocks use the game's ordinary tool selection when they omit toolset.
                     // Queued machines do not employ a worker and therefore do not consume a tool.
-                    jobBlocks[npcType] = new JobBlockInfo(typeName, isAutomatedQueue ? null : NullIfEmpty(GetString(behaviour, "toolset")) ?? "default", isAutomatedQueue);
+                    jobBlocks[npcType] = new JobBlockInfo(typeName, isAutomatedQueue ? null : NullIfEmpty(GetString(behaviour, "toolset")) ?? "default", isAutomatedQueue, isSingleBlock);
                 }
             }
         }
@@ -832,7 +838,7 @@ public sealed class GameDataLoader
                 JobBlockId = block?.BlockTypeId,
                 ToolsetId = block?.ToolsetId,
                 IsAutomatedQueue = block?.IsAutomatedQueue ?? false,
-                IsSingleBlock = block?.IsAutomatedQueue ?? false
+                IsSingleBlock = block?.IsSingleBlock ?? false
             });
         }
     }
@@ -987,5 +993,5 @@ public sealed class GameDataLoader
     private sealed record GrowableStageInfo(string TypeId, decimal GrowthTimeHours);
     private sealed record GrowableInfo(string GrowthType, IReadOnlyList<GrowableStageInfo> Stages, string SourceFile);
     private sealed record SimpleFarmPatch(string Id, string NpcType, IReadOnlyList<string> Stages, int FertilityRequirement, string SourceFile);
-    private sealed record JobBlockInfo(string? BlockTypeId, string? ToolsetId, bool IsAutomatedQueue = false);
+    private sealed record JobBlockInfo(string? BlockTypeId, string? ToolsetId, bool IsAutomatedQueue = false, bool IsSingleBlock = false);
 }

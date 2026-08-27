@@ -47,6 +47,7 @@ public sealed class MainWindowLayoutTests
         var source = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "Visualisation", "Sankey.html"));
         var xaml = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindow.xaml"));
         var viewModel = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindowViewModel.cs"));
+        var acquisition = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.GameData", "GameDataAcquisition.cs"));
 
         Assert.Contains("function enableNodeDrag", source, StringComparison.Ordinal);
         Assert.Contains("function layoutSankey", source, StringComparison.Ordinal);
@@ -80,6 +81,8 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("function collapseItemNodes", source, StringComparison.Ordinal);
         Assert.Contains("retainItem(item.id, 'Output')", source, StringComparison.Ordinal);
         Assert.Contains("collapsedItemNodes", source, StringComparison.Ordinal);
+        Assert.Contains("tooltip.append('strong').text", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("tooltip.html(", source, StringComparison.Ordinal);
         Assert.Contains("NodeSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("LayerSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("NodeLayoutDirection", xaml, StringComparison.Ordinal);
@@ -87,10 +90,14 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("Minimum=\"0\" Maximum=\"240\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsIndeterminate=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResetVisualisationView_Click", xaml, StringComparison.Ordinal);
-        Assert.Contains("DebounceVisualisationRefresh", viewModel, StringComparison.Ordinal);
+        Assert.Contains("DebounceVisualisationLayoutUpdate", viewModel, StringComparison.Ordinal);
         Assert.Contains("DispatcherTimer", viewModel, StringComparison.Ordinal);
         Assert.Contains("VisualisationLayoutJson", viewModel, StringComparison.Ordinal);
         Assert.Contains("isVisualisationRendering", viewModel, StringComparison.Ordinal);
+        Assert.Contains("_isLoadingVisualisationSettings", viewModel, StringComparison.Ordinal);
+        Assert.Contains("SaveVisualisationSettings();", viewModel, StringComparison.Ordinal);
+        Assert.Contains("typeof(GameDataAcquisition).Assembly.GetName().Version", acquisition, StringComparison.Ordinal);
+        Assert.DoesNotContain("ColonyOptimizer/0.1.0", acquisition, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 0, 160)", viewModel, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 0, 240)", viewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("VisualGraphNodes", viewModel, StringComparison.Ordinal);
@@ -197,7 +204,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
         Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
         Assert.Contains("origin/main", workflow, StringComparison.Ordinal);
-        Assert.Contains("<Version>1.0.4</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.5</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
 
         var icon = File.ReadAllBytes(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "ColonyOptimizerLogo.ico"));
         var imageCount = BitConverter.ToUInt16(icon, 4);

@@ -74,7 +74,7 @@ Setting `COLONY_OPTIMIZER_VISUAL_SMOKE_TEST=1` before an ordinary launch enables
 - uses an isolated settings profile under `%TEMP%`;
 - runs a ten-wrought-iron-per-minute optimisation with all progression enabled;
 - checks installed-game icon assets and verifies that both graph renderers produce DOM nodes and links;
-- exercises graph navigation and exits with a non-zero code if a check fails; and
+- exercises graph navigation and zero-spacing node layout, then exits with a non-zero code if a check fails; and
 - writes its JSON completion marker to `%TEMP%\ColonyOptimizer\visual-smoke\result.json` unless `COLONY_OPTIMIZER_SMOKE_RESULT_PATH` specifies another location.
 
 When changing the smoke workflow or layout-regression assertions, update this section and the corresponding tests together.

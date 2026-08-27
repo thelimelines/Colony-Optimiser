@@ -121,7 +121,8 @@ public sealed class GameDataAcquisition
         try
         {
             using var client = new HttpClient();
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("ColonyOptimizer/0.1.0");
+            var applicationVersion = typeof(GameDataAcquisition).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+            client.DefaultRequestHeaders.UserAgent.ParseAdd($"ColonyOptimizer/{applicationVersion}");
             await using (var source = await client.GetStreamAsync(RepositoryZipUrl, cancellationToken))
             await using (var target = File.Create(zipPath))
             {

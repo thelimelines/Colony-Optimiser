@@ -15,11 +15,13 @@ At runtime, the app loads game data into the Core model, applies plan and save s
 
 ## Visualisation
 
-The optimiser emits `ProductionFlow` records for allocated recipe inputs and outputs. The WPF view model converts them, job-block counts, and layout settings into a compact serialised node/link projection for the offline WebView2 page. Bundled D3 circular-Sankey and ELK layered renderers handle cyclic graphs. Balanced intermediate materials are connected directly, while source deficits and genuine surpluses retain item nodes. Each renderer reports success or failure to WPF using its rendered DOM counts. Contributor-facing smoke and layout-regression checks are documented in `CONTRIBUTING.md`.
+The optimiser emits `ProductionFlow` records for allocated recipe inputs and outputs. The WPF view model converts the current result, job-block counts, and layout settings into one compact serialised node/link projection for the offline WebView2 page. Bundled D3 circular-Sankey and ELK layered renderers handle cyclic graphs. Balanced intermediate materials are connected directly, while source deficits and genuine surpluses retain item nodes. The Sankey renderer keeps its full iteration count for smaller graphs and reduces it only as graph size grows; node dragging is frame-throttled and updates only the moved node's incident links.
+
+Layout controls coalesce direction and spacing changes for 180 milliseconds. When the timer expires, WPF persists the complete layout once and sends only updated layout options to the page, which rerenders its retained graph rather than rebuilding the production projection. The page sends render-complete or render-failed messages back to WPF so the interface can show progress; smoke mode additionally waits for the render promise and checks the rendered DOM. Tooltip labels, roles, and job-block names are added as text nodes rather than interpolated HTML.
 
 ## Data ingestion
 
-The loader treats the manifest as authoritative and respects its integer ordering. It combines recipe, item, job, science, toolset, timing, growable, and generated-block data into the Core model. Unknown JSON fields create a diagnostic rather than stopping the import. Exact operations and observed upstream fields are recorded in `GAME_DATA_VALIDATION.md`.
+The loader treats the manifest as authoritative and respects its integer ordering. It combines recipe, item, job, science, toolset, timing, growable, and generated-block data into the Core model. Unknown JSON fields create a diagnostic rather than stopping the import. The public-data client identifies itself with the current application assembly version when downloading from GitHub. Exact operations and observed upstream fields are recorded in `GAME_DATA_VALIDATION.md`.
 
 The acquisition service checks common Steam locations, Steam library folders, and the standard Steam path on every ready drive. On first run it enumerates `world.sqlite3` files below each discovered `gamedata\savegames` directory. The selected save folder and last saved/opened plan path are persisted; the saved plan is applied after game data has been loaded on a subsequent launch. Direct folder and file selection remain available. The upstream GitHub source ZIP is cached in `%LOCALAPPDATA%\ColonyOptimizer\GameData\GitHub`.
 
@@ -33,4 +35,4 @@ The acquisition service checks common Steam locations, Steam library folders, an
 
 ## Persistence and diagnostics
 
-Plans are JSON with a `.colonyplan` extension. Loading accepts older and unknown fields while saving writes the current plan schema. Settings and downloaded data locations are distinct from plans. Technical exceptions are written as bounded JSONL files under `%LOCALAPPDATA%\ColonyOptimizer\Logs`; no unrelated filesystem data is collected.
+Plans are JSON with a `.colonyplan` extension. Loading accepts older and unknown fields while saving writes the current plan schema. Settings and downloaded data locations are distinct from plans. Visualiser settings are loaded together under a startup guard, so loading cannot trigger a partial write; later layout changes are persisted together after the 180-millisecond debounce. Technical exceptions are written as bounded JSONL files under `%LOCALAPPDATA%\ColonyOptimizer\Logs`; no unrelated filesystem data is collected.

@@ -61,10 +61,15 @@
     }
 
     function showTooltip(node) {
-      const jobBlock = node.jobBlock
-        ? `<br><span style="color:#bdd6d4">Job blocks: ${node.jobBlocks || 1}x ${node.jobBlock}</span>`
-        : '';
-      tooltip.html(`<strong>${node.label}</strong><br><span style="color:#bdd6d4">${node.role || node.kind}</span>${jobBlock}`).style('display', 'block');
+      tooltip.selectAll('*').remove();
+      tooltip.append('strong').text(node.label || '');
+      tooltip.append('br');
+      tooltip.append('span').style('color', '#bdd6d4').text(node.role || node.kind || '');
+      if (node.jobBlock) {
+        tooltip.append('br');
+        tooltip.append('span').style('color', '#bdd6d4').text(`Job blocks: ${node.jobBlocks || 1}x ${node.jobBlock}`);
+      }
+      tooltip.style('display', 'block');
     }
     function moveTooltip() { tooltip.style('left', `${d3.event.clientX + 14}px`).style('top', `${d3.event.clientY + 14}px`); }
     function hideTooltip() { tooltip.style('display', 'none'); }

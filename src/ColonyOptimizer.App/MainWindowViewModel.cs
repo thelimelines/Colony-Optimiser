@@ -31,6 +31,7 @@ public partial class MainWindowViewModel : ObservableObject
     private string? _currentPlanPath;
     private HashSet<string> _plannerItemIds = new(StringComparer.OrdinalIgnoreCase);
     private bool _lastPlanRestored;
+    private bool _isLoadingVisualisationSettings;
     private readonly DispatcherTimer _visualisationRefreshDebounceTimer;
 
     public MainWindowViewModel()
@@ -142,12 +143,23 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _userSettings = _settingsStore.Load();
         LinkedSaveGamePath = _userSettings.LinkedSaveGamePath ?? string.Empty;
-        if (Enum.TryParse<NodeLayoutDirection>(_userSettings.NodeLayoutDirection, ignoreCase: true, out var savedLayoutDirection))
+        _isLoadingVisualisationSettings = true;
+        try
         {
-            NodeLayoutDirection = savedLayoutDirection;
+            if (Enum.TryParse<NodeLayoutDirection>(_userSettings.NodeLayoutDirection, ignoreCase: true, out var savedLayoutDirection))
+            {
+                NodeLayoutDirection = savedLayoutDirection;
+            }
+            NodeSpacing = Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 0, 160);
+            LayerSpacing = Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 0, 240);
         }
-        NodeSpacing = Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 0, 160);
-        LayerSpacing = Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 0, 240);
+        finally
+        {
+            _isLoadingVisualisationSettings = false;
+        }
+        _userSettings.NodeLayoutDirection = NodeLayoutDirection.ToString();
+        _userSettings.NodeSpacing = NodeSpacing;
+        _userSettings.LayerSpacing = LayerSpacing;
         foreach (var recentPlanPath in _userSettings.RecentPlans.Where(File.Exists))
         {
             RecentPlans.Add(recentPlanPath);
@@ -192,8 +204,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
     partial void OnNodeLayoutDirectionChanged(NodeLayoutDirection value)
     {
-        SaveVisualisationSettings();
-        DebounceVisualisationRefresh();
+        DebounceVisualisationLayoutUpdate();
     }
     partial void OnNodeSpacingChanged(int value)
     {
@@ -203,8 +214,7 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        SaveVisualisationSettings();
-        DebounceVisualisationRefresh();
+        DebounceVisualisationLayoutUpdate();
     }
     partial void OnLayerSpacingChanged(int value)
     {
@@ -214,8 +224,7 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        SaveVisualisationSettings();
-        DebounceVisualisationRefresh();
+        DebounceVisualisationLayoutUpdate();
     }
     partial void OnUseTimingOverrideChanged(bool value) => RefreshTimingPresentation();
     partial void OnGameTimeScaleChanged(decimal value) => RefreshTimingPresentation();
@@ -1149,8 +1158,13 @@ public partial class MainWindowViewModel : ObservableObject
         recipe.Outputs.OrderBy(amount => amount.ItemId, StringComparer.OrdinalIgnoreCase).Select(amount => $"out:{amount.ItemId}:{amount.Amount}:{amount.Chance}:{amount.IsOptional}")
             .Concat(recipe.Inputs.OrderBy(amount => amount.ItemId, StringComparer.OrdinalIgnoreCase).Select(amount => $"in:{amount.ItemId}:{amount.Amount}:{amount.Chance}:{amount.IsOptional}")));
 
-    private void DebounceVisualisationRefresh()
+    private void DebounceVisualisationLayoutUpdate()
     {
+        if (_isLoadingVisualisationSettings)
+        {
+            return;
+        }
+
         _visualisationRefreshDebounceTimer.Stop();
         _visualisationRefreshDebounceTimer.Start();
     }
@@ -1158,6 +1172,7 @@ public partial class MainWindowViewModel : ObservableObject
     private void OnVisualisationRefreshDebounceTimerTick(object? sender, EventArgs eventArgs)
     {
         _visualisationRefreshDebounceTimer.Stop();
+        SaveVisualisationSettings();
         OnPropertyChanged(nameof(VisualisationLayoutJson));
     }
 

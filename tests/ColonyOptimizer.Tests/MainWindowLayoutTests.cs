@@ -149,8 +149,11 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("IconSourceFile", bundle, StringComparison.Ordinal);
         Assert.Contains("LogoFile", bundle, StringComparison.Ordinal);
         Assert.Contains("LicenseFile=\"License.rtf\"", bundle, StringComparison.Ordinal);
+        Assert.Contains("SuppressOptionsUI=\"yes\"", bundle, StringComparison.Ordinal);
+        Assert.DoesNotContain("MsiProperty Name=\"InstallFolder\"", bundle, StringComparison.Ordinal);
         Assert.Contains("RemoveColonyPlanFiles", bundle, StringComparison.Ordinal);
         Assert.Contains("MsiProperty Name=\"REMOVE_COLONY_PLAN_FILES\"", bundle, StringComparison.Ordinal);
+        Assert.Contains("StandardDirectory Id=\"ProgramFiles64Folder\"", package, StringComparison.Ordinal);
         Assert.Contains("EulaRichedit", theme, StringComparison.Ordinal);
         Assert.Contains("Remove saved Colony Optimiser plan files", theme, StringComparison.Ordinal);
         Assert.Contains("MIT License", license, StringComparison.Ordinal);
@@ -163,6 +166,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
         Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
         Assert.Contains("origin/main", workflow, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.4</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
     }
 
     private static string FindWorkspaceDirectory()

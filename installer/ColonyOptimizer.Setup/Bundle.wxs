@@ -14,6 +14,7 @@
           ThemeFile="Theme.xml"
           LicenseFile="License.rtf"
           LogoFile="$(var.BrandLogoPath)"
+          SuppressOptionsUI="yes"
           ShowVersion="yes" />
     </BootstrapperApplication>
     <Chain>

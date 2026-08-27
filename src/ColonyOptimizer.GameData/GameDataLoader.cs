@@ -696,7 +696,7 @@ public sealed class GameDataLoader
             Upsert(database.Jobs, job => job.Id, resourceJobId, () => new JobTypeDefinition
             {
                 Id = resourceJobId,
-                DisplayName = $"Miner — {DisplayName.FromIdentifier(source.OutputItemId)}",
+                DisplayName = $"Miner ({DisplayName.FromIdentifier(source.OutputItemId)})",
                 JobBlockId = minerBlock?.BlockTypeId,
                 ToolsetId = minerBlock?.ToolsetId
             });

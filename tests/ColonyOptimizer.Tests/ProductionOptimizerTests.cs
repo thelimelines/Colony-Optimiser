@@ -109,8 +109,8 @@ public sealed class ProductionOptimizerTests
     public void separates_miner_requirements_by_core_resource()
     {
         var database = CreateDatabase(activeSeconds: 100m);
-        database.Jobs.Add(new JobTypeDefinition { Id = "pipliz.minerjob.ironore", DisplayName = "Miner — Iron ore", ActiveSecondsPerCycle = 100m });
-        database.Jobs.Add(new JobTypeDefinition { Id = "pipliz.minerjob.copperore", DisplayName = "Miner — Copper ore", ActiveSecondsPerCycle = 100m });
+        database.Jobs.Add(new JobTypeDefinition { Id = "pipliz.minerjob.ironore", DisplayName = "Miner (Iron ore)", ActiveSecondsPerCycle = 100m });
+        database.Jobs.Add(new JobTypeDefinition { Id = "pipliz.minerjob.copperore", DisplayName = "Miner (Copper ore)", ActiveSecondsPerCycle = 100m });
         database.Recipes.Add(Recipe("pipliz.minerjob.infiniteiron", "pipliz.minerjob.ironore", 60m, "ironore"));
         database.Recipes.Add(Recipe("pipliz.minerjob.infinitecopper", "pipliz.minerjob.copperore", 60m, "copperore"));
 
@@ -123,13 +123,13 @@ public sealed class ProductionOptimizerTests
             copper =>
             {
                 Assert.Equal("pipliz.minerjob.copperore", copper.JobTypeId);
-                Assert.Equal("Miner — Copper ore", copper.JobDisplayName);
+                Assert.Equal("Miner (Copper ore)", copper.JobDisplayName);
                 Assert.Equal(1, copper.Workers);
             },
             iron =>
             {
                 Assert.Equal("pipliz.minerjob.ironore", iron.JobTypeId);
-                Assert.Equal("Miner — Iron ore", iron.JobDisplayName);
+                Assert.Equal("Miner (Iron ore)", iron.JobDisplayName);
                 Assert.Equal(1, iron.Workers);
             });
     }

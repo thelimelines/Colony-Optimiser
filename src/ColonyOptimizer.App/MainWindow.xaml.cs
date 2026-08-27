@@ -121,6 +121,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ResetVisualisationView_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!_visualisationReady || SankeyWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await SankeyWebView.CoreWebView2.ExecuteScriptAsync("window.resetGraphView && window.resetGraphView();");
+        }
+        catch (Exception exception)
+        {
+            FileLogger.Write(exception, "visualisation-reset-view");
+        }
+    }
+
     private async void SankeyWebViewOnNavigationCompleted(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs eventArgs)
     {
         _visualisationReady = eventArgs.IsSuccess;

@@ -676,10 +676,13 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <StackPanel Margin="0,0,0,10">
-                            <TabControl Height="40" SelectedIndex="{Binding SelectedVisualisationIndex}">
-                                <TabItem Header="Sankey" />
-                                <TabItem Header="Node visualiser" />
-                            </TabControl>
+                            <DockPanel Height="40">
+                                <Button DockPanel.Dock="Right" Content="Reset view" Padding="10,2" Margin="10,0,0,0" Click="ResetVisualisationView_Click" ToolTip="Return the graph to its initial position and zoom" />
+                                <TabControl SelectedIndex="{Binding SelectedVisualisationIndex}">
+                                    <TabItem Header="Sankey" />
+                                    <TabItem Header="Node visualiser" />
+                                </TabControl>
+                            </DockPanel>
                             <Border Background="#14262A" BorderBrush="#547176" BorderThickness="1" Padding="10,7" Margin="0,8,0,0" Visibility="{Binding IsNodeVisualiserSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

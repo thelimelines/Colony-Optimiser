@@ -57,6 +57,10 @@
     function applyViewTransform() {
       viewport.attr('transform', `translate(${viewTransform.x},${viewTransform.y}) scale(${viewTransform.k})`);
     }
+    function resetGraphView() {
+      viewTransform = { x: 0, y: 0, k: 1 };
+      applyViewTransform();
+    }
     function isNodeTarget(target) {
       return target instanceof Element && target.closest('.node');
     }
@@ -426,6 +430,7 @@
     async function renderGraph(data, generation) {
       const hasData = data && data.nodes && data.nodes.length && data.links && data.links.length;
       const mode = data && data.mode === 1 ? 1 : 0;
+      if (mode !== graphState.mode) resetGraphView();
       if (!hasData) {
         if (generation !== renderGeneration) return;
         viewport.selectAll('*').remove();
@@ -460,6 +465,7 @@
       return renderPromise;
     };
     window.waitForGraph = () => renderPromise;
+    window.resetGraphView = resetGraphView;
     window.getGraphState = () => graphState;
     window.verifyNavigation = () => {
       const original = { x: viewTransform.x, y: viewTransform.y, k: viewTransform.k };

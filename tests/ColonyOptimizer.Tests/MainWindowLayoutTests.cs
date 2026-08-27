@@ -55,6 +55,9 @@ public sealed class MainWindowLayoutTests
         Assert.Contains(".iterations(24)", source, StringComparison.Ordinal);
         Assert.Contains("let renderGeneration = 0", source, StringComparison.Ordinal);
         Assert.Contains("generation !== renderGeneration", source, StringComparison.Ordinal);
+        Assert.Contains("function resetGraphView", source, StringComparison.Ordinal);
+        Assert.Contains("mode !== graphState.mode", source, StringComparison.Ordinal);
+        Assert.Contains("window.resetGraphView = resetGraphView", source, StringComparison.Ordinal);
         Assert.Contains("renderSankey(collapsedGraph", source, StringComparison.Ordinal);
         Assert.Contains("function layoutSankeyLabels", source, StringComparison.Ordinal);
         Assert.DoesNotContain("mix-blend-mode: screen", source, StringComparison.Ordinal);
@@ -74,6 +77,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("NodeSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("LayerSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("NodeLayoutDirection", xaml, StringComparison.Ordinal);
+        Assert.Contains("ResetVisualisationView_Click", xaml, StringComparison.Ordinal);
         Assert.Contains("DebounceVisualisationRefresh", viewModel, StringComparison.Ordinal);
         Assert.Contains("DispatcherTimer", viewModel, StringComparison.Ordinal);
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
@@ -94,6 +98,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("MainTabs.SelectedIndex = 6", source, StringComparison.Ordinal);
         Assert.Contains("Environment.SpecialFolder.LocalApplicationData", source, StringComparison.Ordinal);
         Assert.Contains("MicrosoftEdgeWebview2Setup.exe", source, StringComparison.Ordinal);
+        Assert.Contains("ResetVisualisationView_Click", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -155,9 +160,15 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("MsiProperty Name=\"REMOVE_COLONY_PLAN_FILES\"", bundle, StringComparison.Ordinal);
         Assert.Contains("StandardDirectory Id=\"ProgramFiles64Folder\"", package, StringComparison.Ordinal);
         Assert.Contains("EulaRichedit", theme, StringComparison.Ordinal);
+        Assert.Contains("IconFile=", theme, StringComparison.Ordinal);
+        Assert.Contains("ColonyOptimizerLogo.ico", theme, StringComparison.Ordinal);
         Assert.Contains("Remove saved Colony Optimiser plan files", theme, StringComparison.Ordinal);
         Assert.Contains("MIT License", license, StringComparison.Ordinal);
         Assert.Contains("Permission is hereby granted", license, StringComparison.Ordinal);
+        Assert.Contains("a copy of this software", license, StringComparison.Ordinal);
+        Assert.Contains("EXPRESS OR IMPLIED", license, StringComparison.Ordinal);
+        Assert.DoesNotContain("a copy\\par", license, StringComparison.Ordinal);
+        Assert.DoesNotContain("EXPRESS OR\\par", license, StringComparison.Ordinal);
         Assert.Contains("ARPPRODUCTICON", package, StringComparison.Ordinal);
         Assert.Contains("RemoveRecordedColonyPlans", package, StringComparison.Ordinal);
         Assert.Contains("REMOVE_COLONY_PLAN_FILES=1", package, StringComparison.Ordinal);
@@ -167,6 +178,16 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
         Assert.Contains("origin/main", workflow, StringComparison.Ordinal);
         Assert.Contains("<Version>1.0.4</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+
+        var icon = File.ReadAllBytes(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "ColonyOptimizerLogo.ico"));
+        var imageCount = BitConverter.ToUInt16(icon, 4);
+        var imageWidths = Enumerable.Range(0, imageCount)
+            .Select(index => icon[6 + index * 16] == 0 ? 256 : icon[6 + index * 16])
+            .ToArray();
+        Assert.Contains(16, imageWidths);
+        Assert.Contains(32, imageWidths);
+        Assert.Contains(48, imageWidths);
+        Assert.Contains(256, imageWidths);
     }
 
     private static string FindWorkspaceDirectory()

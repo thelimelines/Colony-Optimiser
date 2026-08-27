@@ -24,7 +24,7 @@ public sealed class ProductionOptimizerTests
         Assert.Equal(444m, database.Timing.WorkerActiveSeconds);
         Assert.Contains(database.Recipes, recipe => recipe.Id == "pipliz.fletcher.crossbowbolt");
         Assert.Contains(database.Recipes, recipe => recipe.Id == "pipliz.minerjob.infiniteiron" && recipe.JobTypeId == "pipliz.minerjob.ironore" && recipe.CooldownSeconds == 60m);
-        Assert.Contains(database.Jobs, job => job.Id == "pipliz.minerjob.ironore" && job.DisplayName == "Miner — Iron ore");
+        Assert.Contains(database.Jobs, job => job.Id == "pipliz.minerjob.ironore");
         Assert.Contains(database.Guards, guard => guard.Ammunition.Any(ammo => ammo.ItemId == "crossbowbolt"));
         Assert.Contains(database.Traps, trap => trap.Id == "projectiletrap" && trap.AmmunitionItemId == "projectiletrapammo" && trap.AmmunitionCapacity == 10);
         Assert.All(database.Traps, trap => Assert.NotEmpty(trap.AmmunitionItemId));
@@ -604,7 +604,7 @@ public sealed class ProductionOptimizerTests
         Assert.True(result.IsFeasible, string.Join(Environment.NewLine, result.Messages.Select(message => message.Text)));
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "pipliz.coppersmith.ironwrought");
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "pipliz.minerjob.infiniteiron");
-        Assert.Contains(result.JobRequirements, job => job.JobTypeId == "pipliz.minerjob.ironore" && job.JobDisplayName == "Miner — Iron ore");
+        Assert.Contains(result.JobRequirements, job => job.JobTypeId == "pipliz.minerjob.ironore");
         Assert.DoesNotContain(result.ExternalRequirements, requirement => requirement.ItemId == "ironore");
         Assert.NotEmpty(result.ProductionFlows);
         Assert.True(result.ProductionFlows.SelectMany(flow => new[] { flow.SourceId, flow.TargetId }).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1);

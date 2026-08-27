@@ -37,17 +37,20 @@ public sealed class UserSettings
 
 public sealed class UserSettingsStore
 {
-    private static readonly string Root = AppRuntime.IsVisualSmokeTest
-        ? AppRuntime.VisualSmokeRoot
-        : Environment.GetEnvironmentVariable("COLONY_OPTIMIZER_SETTINGS_ROOT")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ColonyOptimizer");
-    private static readonly string PathName = Path.Combine(Root, "settings.json");
+    private readonly string _root;
+    private readonly string _pathName;
+
+    public UserSettingsStore(string? root = null)
+    {
+        _root = root ?? GetDefaultRoot();
+        _pathName = Path.Combine(_root, "settings.json");
+    }
 
     public UserSettings Load()
     {
         try
         {
-            return File.Exists(PathName) ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(PathName), JsonDefaults.Options) ?? new UserSettings() : new UserSettings();
+            return File.Exists(_pathName) ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(_pathName), JsonDefaults.Options) ?? new UserSettings() : new UserSettings();
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -61,10 +64,10 @@ public sealed class UserSettingsStore
         string? temporaryPath = null;
         try
         {
-            Directory.CreateDirectory(Root);
-            temporaryPath = $"{PathName}.{Guid.NewGuid():N}.tmp";
+            Directory.CreateDirectory(_root);
+            temporaryPath = $"{_pathName}.{Guid.NewGuid():N}.tmp";
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, JsonDefaults.Options));
-            File.Move(temporaryPath, PathName, overwrite: true);
+            File.Move(temporaryPath, _pathName, overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -85,6 +88,11 @@ public sealed class UserSettingsStore
             }
         }
     }
+
+    private static string GetDefaultRoot() => AppRuntime.IsVisualSmokeTest
+        ? AppRuntime.VisualSmokeRoot
+        : Environment.GetEnvironmentVariable("COLONY_OPTIMIZER_SETTINGS_ROOT")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ColonyOptimizer");
 }
 
 public static class JsonDefaults

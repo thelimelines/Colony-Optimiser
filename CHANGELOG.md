@@ -4,8 +4,12 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 ## Unreleased
 
+## [1.0.6] - 2026-08-28
+
 ### Fixed
 
+- Fixed the Setup theme/icon payload so the installer can initialise after extraction.
+- Added release-package smoke testing for the Setup UI, MSI deployment, and portable ZIP.
 - Package the exact .NET runtime packs selected by the completed publish when collecting licence notices, rather than selecting an arbitrary cached version.
 - Keep settings loading, saving, and diagnostic logging from obscuring an operation when ordinary filesystem access fails.
 - Describe the bundled WebView2 online bootstrapper accurately.
@@ -24,4 +28,3 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 - Improved Sankey and node-graph rendering for large plans, including safe tooltip text handling and zero-spacing layouts.
 - Corrected miner labels and refreshed the application's HTTP user agent.
-- Added an installer-package smoke test to the release verification workflow.

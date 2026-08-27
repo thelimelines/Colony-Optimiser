@@ -123,6 +123,10 @@ public sealed class MainWindowLayoutTests
         var script = File.ReadAllText(Path.Combine(repository, "scripts", "Publish-Release.ps1"));
         var workflow = File.ReadAllText(Path.Combine(repository, ".github", "workflows", "release.yml"));
         var bundle = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "Bundle.wxs"));
+        var package = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Installer", "Package.wxs"));
+        var theme = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "Theme.xml"));
+        var license = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "License.rtf"));
+        var planCleanup = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Installer", "RemoveRecordedColonyPlans.ps1"));
 
         Assert.Contains("-Setup.exe", readme, StringComparison.Ordinal);
         Assert.Contains("-win-x64.msi", readme, StringComparison.Ordinal);
@@ -134,6 +138,20 @@ public sealed class MainWindowLayoutTests
         Assert.DoesNotContain("LinkId=2124701", script, StringComparison.Ordinal);
         Assert.DoesNotContain("<ExePackage", bundle, StringComparison.Ordinal);
         Assert.DoesNotContain("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
+        Assert.Contains("IconSourceFile", bundle, StringComparison.Ordinal);
+        Assert.Contains("LogoFile", bundle, StringComparison.Ordinal);
+        Assert.Contains("LicenseFile=\"License.rtf\"", bundle, StringComparison.Ordinal);
+        Assert.Contains("RemoveColonyPlanFiles", bundle, StringComparison.Ordinal);
+        Assert.Contains("MsiProperty Name=\"REMOVE_COLONY_PLAN_FILES\"", bundle, StringComparison.Ordinal);
+        Assert.Contains("EulaRichedit", theme, StringComparison.Ordinal);
+        Assert.Contains("Remove saved Colony Optimiser plan files", theme, StringComparison.Ordinal);
+        Assert.Contains("MIT License", license, StringComparison.Ordinal);
+        Assert.Contains("Permission is hereby granted", license, StringComparison.Ordinal);
+        Assert.Contains("ARPPRODUCTICON", package, StringComparison.Ordinal);
+        Assert.Contains("RemoveRecordedColonyPlans", package, StringComparison.Ordinal);
+        Assert.Contains("REMOVE_COLONY_PLAN_FILES=1", package, StringComparison.Ordinal);
+        Assert.Contains(".colonyplan", planCleanup, StringComparison.Ordinal);
+        Assert.Contains("RecentPlans", planCleanup, StringComparison.Ordinal);
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
         Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
         Assert.Contains("origin/main", workflow, StringComparison.Ordinal);

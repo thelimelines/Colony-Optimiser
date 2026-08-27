@@ -6,6 +6,7 @@
     <SuppressPdbOutput>true</SuppressPdbOutput>
     <SuppressValidation>true</SuppressValidation>
     <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\publish</PublishDirectory>
-    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);PublishDirectory=$(PublishDirectory)</DefineConstants>
+    <BrandIconPath>$(MSBuildProjectDirectory)\..\..\src\ColonyOptimizer.App\Assets\ColonyOptimizerLogo.ico</BrandIconPath>
+    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);PublishDirectory=$(PublishDirectory);BrandIconPath=$(BrandIconPath)</DefineConstants>
   </PropertyGroup>
 </Project>

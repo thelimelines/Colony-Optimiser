@@ -7,9 +7,25 @@
       Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="ColonyOptimizerProductIcon" SourceFile="$(var.BrandIconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="ColonyOptimizerProductIcon" />
+    <CustomAction
+        Id="RemoveRecordedColonyPlans"
+        Directory="SystemFolder"
+        ExeCommand="WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[#RemoveRecordedColonyPlansScript]&quot;"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveRecordedColonyPlans" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot; AND REMOVE_COLONY_PLAN_FILES=1" />
+    </InstallExecuteSequence>
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="$(var.ProductDisplayName)" />
+      <Directory Id="INSTALLFOLDER" Name="$(var.ProductDisplayName)">
+        <Component Id="RecordedPlanCleanup" Guid="1C1760E0-07AF-4700-8D29-94DCCF3EE1ED">
+          <File Id="RemoveRecordedColonyPlansScript" Source="RemoveRecordedColonyPlans.ps1" KeyPath="yes" />
+        </Component>
+      </Directory>
     </StandardDirectory>
     <Files Directory="INSTALLFOLDER" Include="$(var.PublishDirectory)\**" />
 

@@ -131,15 +131,24 @@ public sealed class ForestrySourceDefinition
     public string JobTypeId { get; set; } = "pipliz.forester";
     public string LogItemId { get; set; } = string.Empty;
     public string LeavesItemId { get; set; } = string.Empty;
-    public int TreesPerForesterPerCycle { get; set; } = 9;
+    public decimal WorkSecondsPerTree { get; set; } = 390m / 9m;
     public int LogsPerTree { get; set; } = 4;
     public int LeavesPerTree { get; set; } = 9;
-    public decimal WorkSecondsPerForesterCycle { get; set; } = 390m;
     public int DefaultForesterCount { get; set; } = 1;
     public int DefaultPlotWidth { get; set; } = 3;
     public int DefaultPlotLength { get; set; } = 33;
     public string? RequiredScience { get; set; }
     public string SourceFile { get; set; } = string.Empty;
+
+    public int GetHarvestCapacityPerForester(decimal activeSecondsPerCycle)
+    {
+        if (WorkSecondsPerTree <= 0m || activeSecondsPerCycle <= 0m)
+        {
+            return 0;
+        }
+
+        return (int)Math.Min(int.MaxValue, decimal.Floor(activeSecondsPerCycle / WorkSecondsPerTree));
+    }
 }
 
 public sealed class JobTypeDefinition

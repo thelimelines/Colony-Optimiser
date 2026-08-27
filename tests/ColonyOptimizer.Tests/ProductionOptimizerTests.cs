@@ -22,6 +22,8 @@ public sealed class ProductionOptimizerTests
         Assert.True(database.CropFarmSources.Count >= 9);
         Assert.Equal(720m, database.Timing.CycleSeconds);
         Assert.Equal(444m, database.Timing.WorkerActiveSeconds);
+        var forestry = Assert.Single(database.ForestrySources, source => source.Id == "forestry");
+        Assert.Equal(10, forestry.GetHarvestCapacityPerForester(database.Timing.WorkerActiveSeconds));
         Assert.Contains(database.Recipes, recipe => recipe.Id == "pipliz.fletcher.crossbowbolt");
         Assert.Contains(database.Recipes, recipe => recipe.Id == "pipliz.minerjob.infiniteiron" && recipe.JobTypeId == "pipliz.minerjob.ironore" && recipe.CooldownSeconds == 60m);
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.minerjob.ironore");
@@ -210,10 +212,9 @@ public sealed class ProductionOptimizerTests
             JobTypeId = "worker",
             LogItemId = "logs",
             LeavesItemId = "leaves",
-            TreesPerForesterPerCycle = 100,
+            WorkSecondsPerTree = 1m,
             LogsPerTree = 1,
-            LeavesPerTree = 1,
-            WorkSecondsPerForesterCycle = 1m
+            LeavesPerTree = 1
         });
         var plan = Plan(("logs", Math.Max(1, expectedTrees)));
         plan.ForestryLayouts["forest"] = new ForestryLayout { ForesterCount = 1, PlotWidth = width, PlotLength = length };
@@ -225,6 +226,71 @@ public sealed class ProductionOptimizerTests
         {
             Assert.Equal(expectedTrees, result.TotalOutputs.Single(output => output.ItemId == "logs").PerCycle);
         }
+    }
+
+    [Fact]
+    public void forestry_calculates_whole_tree_capacity_from_the_worker_schedule()
+    {
+        var database = CreateDatabase(activeSeconds: 444m);
+        database.ForestrySources.Add(new ForestrySourceDefinition
+        {
+            Id = "forest",
+            DisplayName = "Forest",
+            JobTypeId = "worker",
+            LogItemId = "logs",
+            LeavesItemId = "leaves",
+            WorkSecondsPerTree = 390m / 9m,
+            LogsPerTree = 1,
+            LeavesPerTree = 0
+        });
+        var plan = Plan(("logs", 10m));
+        plan.ForestryLayouts["forest"] = new ForestryLayout { ForesterCount = 1, PlotWidth = 3, PlotLength = 33 };
+
+        var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(10m, result.TotalOutputs.Single(output => output.ItemId == "logs").PerCycle);
+        Assert.Equal(10, database.ForestrySources.Single().GetHarvestCapacityPerForester(444m));
+        Assert.Equal(11, database.ForestrySources.Single().GetHarvestCapacityPerForester(480m));
+    }
+
+    [Fact]
+    public void forestry_uses_the_enabled_timing_override_for_harvest_capacity()
+    {
+        var database = CreateDatabase(activeSeconds: 444m);
+        database.ForestrySources.Add(new ForestrySourceDefinition
+        {
+            Id = "forest",
+            DisplayName = "Forest",
+            JobTypeId = "forester",
+            LogItemId = "logs",
+            LeavesItemId = "leaves",
+            WorkSecondsPerTree = 390m / 9m,
+            LogsPerTree = 1,
+            LeavesPerTree = 0
+        });
+        var plan = Plan(("logs", 11m));
+        plan.ForestryLayouts["forest"] = new ForestryLayout { ForesterCount = 1, PlotWidth = 3, PlotLength = 33 };
+
+        var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings
+        {
+            TimingOverride = new TimingOverride
+            {
+                IsEnabled = true,
+                GameTimeScale = 120m,
+                DayTimeStart = 4.5m,
+                DayTimeEnd = 19.5m,
+                GuardShiftDayStart = 4m,
+                GuardShiftDayEnd = 19m,
+                GuardShiftNightStart = 17m,
+                GuardShiftNightEnd = 8m,
+                SleepTimeStart = 20.5m,
+                SleepTimeEnd = 4.5m
+            }
+        });
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(11m, result.TotalOutputs.Single(output => output.ItemId == "logs").PerCycle);
     }
 
     [Fact]
@@ -279,10 +345,9 @@ public sealed class ProductionOptimizerTests
             JobTypeId = "worker",
             LogItemId = "logs",
             LeavesItemId = "leaves",
-            TreesPerForesterPerCycle = 100,
+            WorkSecondsPerTree = 1m,
             LogsPerTree = 1,
             LeavesPerTree = 0,
-            WorkSecondsPerForesterCycle = 1m,
             DefaultForesterCount = 1,
             DefaultPlotWidth = 3,
             DefaultPlotLength = 15

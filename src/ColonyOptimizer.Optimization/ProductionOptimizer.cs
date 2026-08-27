@@ -214,16 +214,24 @@ public sealed class ProductionOptimizer
                 ? layout.PlotLength
                 : Math.Max(1, source.DefaultPlotLength);
             var totalTrees = ForestryLayout.GetTreeSlotCount(plotWidth, plotLength);
-            var harvestCapacity = foresters * source.TreesPerForesterPerCycle;
+            var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(source.JobTypeId, StringComparison.OrdinalIgnoreCase));
+            var activeSecondsPerForester = job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
+            var harvestCapacityPerForester = source.GetHarvestCapacityPerForester(activeSecondsPerForester);
+            if (harvestCapacityPerForester <= 0)
+            {
+                continue;
+            }
+
+            var harvestCapacity = foresters * harvestCapacityPerForester;
             var harvestedTrees = Math.Min(totalTrees, harvestCapacity);
-            var workersRequired = Math.Max(1, (int)Math.Ceiling(harvestedTrees / (decimal)source.TreesPerForesterPerCycle));
+            var workersRequired = Math.Max(1, (int)Math.Ceiling(harvestedTrees / (decimal)harvestCapacityPerForester));
             var recipe = new RecipeDefinition
             {
                 Id = $"{source.Id}.harvest",
                 DisplayName = source.DisplayName,
                 JobTypeId = source.JobTypeId,
                 CooldownSeconds = timing.CycleSeconds,
-                WorkloadSeconds = harvestedTrees * source.WorkSecondsPerForesterCycle / source.TreesPerForesterPerCycle,
+                WorkloadSeconds = harvestedTrees * source.WorkSecondsPerTree,
                 DedicatedWorkersPerCraft = workersRequired,
                 UnitLabel = "Forest",
                 RequiredScience = source.RequiredScience,

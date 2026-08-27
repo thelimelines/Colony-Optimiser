@@ -52,6 +52,8 @@ Worker-operated jobs use their configured active time, or the general worker-act
 
 Simple crop farms are modelled as dedicated farm areas. Their growable stages advance once per night, so an `n`-stage crop has a growth period of `n - 1` full game cycles. Each configured field produces its harvested-tile count divided by that period; one farmer is reserved for the area. The crop source tab records field tile counts, growth, science, and expected output per game cycle.
 
+Forestry also reserves dedicated workers. Trees occupy physical 3-by-3 plot slots, and each forester's whole-tree capacity is calculated as `floor(active worker seconds / forestry work seconds per tree)`, capped by the configured plot. The capacity therefore updates with loaded or overridden work timing instead of using a fixed trees-per-cycle display.
+
 ## Integer scaling and rounding
 
 CP-SAT accepts integer coefficients, so item quantities are multiplied by `1,000,000` and rounded to the nearest integer using midpoint rounding away from zero. This retains quantities down to one millionth of an item; each converted coefficient or demand can differ from its decimal value by at most half a millionth. The same conversion is used for material-balance coefficients and the raw-resource objective.

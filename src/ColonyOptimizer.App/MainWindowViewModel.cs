@@ -643,7 +643,7 @@ public partial class MainWindowViewModel : ObservableObject
         ForestrySourceRows.Clear();
         foreach (var source in database.ForestrySources.OrderBy(source => source.DisplayName))
         {
-            var row = new ForestrySourceRow(source, database);
+            var row = new ForestrySourceRow(source, EffectiveTiming, database);
             ForestrySourceRows.Add(row);
             AreaJobRows.Add(row);
         }
@@ -998,6 +998,10 @@ public partial class MainWindowViewModel : ObservableObject
         foreach (var cropSource in CropSourceRows)
         {
             cropSource.UpdateTiming(timing);
+        }
+        foreach (var forestrySource in ForestrySourceRows)
+        {
+            forestrySource.UpdateTiming(timing);
         }
         foreach (var guard in GuardRows)
         {
@@ -1383,9 +1387,14 @@ public partial class ForestrySourceRow : ObservableObject
 {
     private readonly ForestrySourceDefinition _source;
 
-    public ForestrySourceRow(ForestrySourceDefinition source, GameDatabase database)
+    private GameTiming _timing;
+    private readonly decimal? _configuredActiveSecondsPerCycle;
+
+    public ForestrySourceRow(ForestrySourceDefinition source, GameTiming timing, GameDatabase database)
     {
         _source = source;
+        _timing = timing;
+        _configuredActiveSecondsPerCycle = database.Jobs.FirstOrDefault(job => job.Id.Equals(source.JobTypeId, StringComparison.OrdinalIgnoreCase))?.ActiveSecondsPerCycle;
         Id = source.Id;
         DisplayName = source.DisplayName;
         LogIconPath = database.Items.FirstOrDefault(item => item.Id.Equals(source.LogItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
@@ -1434,8 +1443,17 @@ public partial class ForestrySourceRow : ObservableObject
     [ObservableProperty] private int plotLength;
 
     private int TotalTrees => ForestryLayout.GetTreeSlotCount(PlotWidth, PlotLength);
-    private int HarvestedTrees => Math.Min(TotalTrees, Math.Max(1, ForesterCount) * _source.TreesPerForesterPerCycle);
+    private int HarvestCapacityPerForester => _source.GetHarvestCapacityPerForester(_configuredActiveSecondsPerCycle ?? _timing.WorkerActiveSeconds);
+    private int HarvestedTrees => Math.Min(TotalTrees, Math.Max(1, ForesterCount) * HarvestCapacityPerForester);
     private static string DisplayNameFromId(string id) => ColonyOptimizer.Core.DisplayName.FromIdentifier(id);
+
+    public void UpdateTiming(GameTiming timing)
+    {
+        _timing = timing;
+        OnPropertyChanged(nameof(OutputPerCycle));
+        OnPropertyChanged(nameof(HarvestRate));
+        OnPropertyChanged(nameof(Cadence));
+    }
 
     partial void OnForesterCountChanged(int value)
     {

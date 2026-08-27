@@ -5,14 +5,21 @@
       Name="$(var.ProductDisplayName)"
       Manufacturer="$(var.ProductPublisher)"
       Version="$(var.Version)"
-      UpgradeCode="92E92929-141A-484D-B0B4-9B744B559F6C">
+      UpgradeCode="92E92929-141A-484D-B0B4-9B744B559F6C"
+      IconSourceFile="$(var.BrandIconPath)">
+    <Variable Name="RemoveColonyPlanFiles" Type="numeric" Value="0" bal:Overridable="yes" />
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
-          Theme="hyperlinkLicense"
-          LicenseUrl="https://opensource.org/license/mit/" />
+          Theme="rtfLargeLicense"
+          ThemeFile="Theme.xml"
+          LicenseFile="License.rtf"
+          LogoFile="$(var.BrandLogoPath)"
+          ShowVersion="yes" />
     </BootstrapperApplication>
     <Chain>
-      <MsiPackage SourceFile="$(var.MsiPath)" />
+      <MsiPackage SourceFile="$(var.MsiPath)">
+        <MsiProperty Name="REMOVE_COLONY_PLAN_FILES" Value="[RemoveColonyPlanFiles]" />
+      </MsiPackage>
     </Chain>
   </Bundle>
 </Wix>

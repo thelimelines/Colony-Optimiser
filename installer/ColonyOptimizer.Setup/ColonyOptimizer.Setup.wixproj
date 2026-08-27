@@ -8,6 +8,8 @@
     <InstallerPlatform>x64</InstallerPlatform>
     <SuppressPdbOutput>true</SuppressPdbOutput>
     <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\ColonyOptimizer-$(Version)-win-x64.msi</MsiPath>
-    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);MsiPath=$(MsiPath)</DefineConstants>
+    <BrandIconPath>$(MSBuildProjectDirectory)\..\..\src\ColonyOptimizer.App\Assets\ColonyOptimizerLogo.ico</BrandIconPath>
+    <BrandLogoPath>$(MSBuildProjectDirectory)\..\..\src\ColonyOptimizer.App\Assets\ColonyOptimizerLogo.png</BrandLogoPath>
+    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);MsiPath=$(MsiPath);BrandIconPath=$(BrandIconPath);BrandLogoPath=$(BrandLogoPath)</DefineConstants>
   </PropertyGroup>
 </Project>

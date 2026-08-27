@@ -59,15 +59,25 @@ function Get-RuntimePackPath {
     )
 
     $packageRoot = ($Assets.packageFolders.PSObject.Properties | Select-Object -First 1).Name
-    $dependency = $Assets.project.frameworks.PSObject.Properties.Value.downloadDependencies |
+    $dependency = $Assets.project.frameworks.PSObject.Properties.Value |
+        Where-Object { $null -ne $_.PSObject.Properties['downloadDependencies'] } |
+        ForEach-Object { $_.downloadDependencies } |
         Where-Object { $_.name.Equals($PackageId, [System.StringComparison]::OrdinalIgnoreCase) } |
         Select-Object -First 1
-    if ($null -eq $dependency) {
-        throw "Runtime pack '$PackageId' was not found in $assetsPath. Restore the solution with --runtime win-x64."
+    if ($null -ne $dependency) {
+        $version = ([string]$dependency.version).Trim('[', ']').Split(',')[0].Trim()
+        return Join-Path (Join-Path $packageRoot $PackageId.ToLowerInvariant()) $version
     }
 
-    $version = ([string]$dependency.version).Trim('[', ']').Split(',')[0].Trim()
-    return Join-Path (Join-Path $packageRoot $PackageId.ToLowerInvariant()) $version
+    $runtimePackRoot = Join-Path $packageRoot $PackageId.ToLowerInvariant()
+    $cachedRuntimePack = Get-ChildItem -LiteralPath $runtimePackRoot -Directory -ErrorAction SilentlyContinue |
+        Sort-Object { [Version]$_.Name } -Descending |
+        Select-Object -First 1
+    if ($null -eq $cachedRuntimePack) {
+        throw "Runtime pack '$PackageId' was not found in $assetsPath or $runtimePackRoot. Restore the solution with --runtime win-x64."
+    }
+
+    return $cachedRuntimePack.FullName
 }
 
 function Copy-ReleaseNotice {

@@ -9,6 +9,7 @@
       IconSourceFile="$(var.BrandIconPath)">
     <Variable Name="RemoveColonyPlanFiles" Type="numeric" Value="0" bal:Overridable="yes" />
     <BootstrapperApplication>
+      <Payload SourceFile="$(var.BrandIconPath)" Name="ColonyOptimizerLogo.ico" />
       <bal:WixStandardBootstrapperApplication
           Theme="rtfLargeLicense"
           ThemeFile="Theme.xml"

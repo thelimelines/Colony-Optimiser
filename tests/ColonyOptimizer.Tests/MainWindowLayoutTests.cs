@@ -167,6 +167,8 @@ public sealed class MainWindowLayoutTests
         var theme = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "Theme.xml"));
         var license = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Setup", "License.rtf"));
         var planCleanup = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Installer", "RemoveRecordedColonyPlans.ps1"));
+        var releaseSmoke = File.ReadAllText(Path.Combine(repository, "scripts", "Test-ReleasePackages.ps1"));
+        var releaseScript = File.ReadAllText(Path.Combine(repository, "scripts", "Publish-Release.ps1"));
 
         Assert.Contains("-Setup.exe", readme, StringComparison.Ordinal);
         Assert.Contains("-win-x64.msi", readme, StringComparison.Ordinal);
@@ -180,6 +182,7 @@ public sealed class MainWindowLayoutTests
         Assert.DoesNotContain("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
         Assert.Contains("IconSourceFile", bundle, StringComparison.Ordinal);
         Assert.Contains("LogoFile", bundle, StringComparison.Ordinal);
+        Assert.Contains("<Payload SourceFile=\"$(var.BrandIconPath)\" Name=\"ColonyOptimizerLogo.ico\" />", bundle, StringComparison.Ordinal);
         Assert.Contains("LicenseFile=\"License.rtf\"", bundle, StringComparison.Ordinal);
         Assert.Contains("SuppressOptionsUI=\"yes\"", bundle, StringComparison.Ordinal);
         Assert.DoesNotContain("MsiProperty Name=\"InstallFolder\"", bundle, StringComparison.Ordinal);
@@ -189,6 +192,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("EulaRichedit", theme, StringComparison.Ordinal);
         Assert.Contains("IconFile=", theme, StringComparison.Ordinal);
         Assert.Contains("ColonyOptimizerLogo.ico", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("..\\..\\src\\ColonyOptimizer.App", theme, StringComparison.Ordinal);
         Assert.Contains("Remove saved Colony Optimiser plan files", theme, StringComparison.Ordinal);
         Assert.Contains("MIT License", license, StringComparison.Ordinal);
         Assert.Contains("Permission is hereby granted", license, StringComparison.Ordinal);
@@ -204,7 +208,14 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
         Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
         Assert.Contains("origin/main", workflow, StringComparison.Ordinal);
-        Assert.Contains("<Version>1.0.5</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+        Assert.Contains("Test-ReleasePackages.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("Test-SetupUserInterface", releaseSmoke, StringComparison.Ordinal);
+        Assert.Contains("Test-SetupLayout", releaseSmoke, StringComparison.Ordinal);
+        Assert.Contains("Test-MsiAdministrativeInstall", releaseSmoke, StringComparison.Ordinal);
+        Assert.Contains("Expand-Archive", releaseSmoke, StringComparison.Ordinal);
+        Assert.Contains("PSObject.Properties['downloadDependencies']", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("Get-ChildItem -LiteralPath $runtimePackRoot", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.6</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
 
         var icon = File.ReadAllBytes(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "ColonyOptimizerLogo.ico"));
         var imageCount = BitConverter.ToUInt16(icon, 4);

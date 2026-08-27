@@ -84,7 +84,7 @@
       "colonyoptimizer.gamedata": {
         "type": "Project",
         "dependencies": {
-          "ColonyOptimizer.Core": "[1.0.5, )",
+          "ColonyOptimizer.Core": "[1.0.6, )",
           "Microsoft.Data.Sqlite.Core": "[10.0.11, )",
           "SQLitePCLRaw.provider.winsqlite3": "[3.0.5, )"
         }
@@ -92,7 +92,7 @@
       "colonyoptimizer.optimization": {
         "type": "Project",
         "dependencies": {
-          "ColonyOptimizer.Core": "[1.0.5, )",
+          "ColonyOptimizer.Core": "[1.0.6, )",
           "Google.OrTools": "[9.15.6755, )"
         }
       }

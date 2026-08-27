@@ -71,6 +71,11 @@ jobs:
         run: |
           $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF_NAME } else { ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version }
           .\scripts\Publish-Release.ps1 -Version $version
+      - name: Smoke release packages
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF_NAME.TrimStart('v') } else { ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version }
+          .\scripts\Test-ReleasePackages.ps1 -ArtifactRoot (Join-Path $PWD "artifacts") -Version $version
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
         with:

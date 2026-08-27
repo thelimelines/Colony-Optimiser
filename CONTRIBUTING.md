@@ -79,6 +79,15 @@ Setting `COLONY_OPTIMIZER_VISUAL_SMOKE_TEST=1` before an ordinary launch enables
 
 When changing the smoke workflow or layout-regression assertions, update this section and the corresponding tests together.
 
+For a release-packaging change, build the release assets and smoke-test every distributable before opening a pull request:
+
+```powershell
+.\scripts\Publish-Release.ps1 -Version <version>
+.\scripts\Test-ReleasePackages.ps1 -ArtifactRoot artifacts -Version <version>
+```
+
+The package smoke test verifies the Setup UI can start without installing, checks the bundle's embedded MSI chain through layout mode, performs an administrative MSI deployment into a temporary folder, and checks required portable-ZIP files. It does not replace the manual clean Setup installation required before release.
+
 ## Submit a pull request
 
 Before opening a pull request:

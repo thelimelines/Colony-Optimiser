@@ -677,24 +677,29 @@ public sealed class GameDataLoader
 
         const string minerJobId = "pipliz.minerjob";
         jobBlocks.TryGetValue(minerJobId, out var minerBlock);
-        Upsert(database.Jobs, job => job.Id, minerJobId, () => new JobTypeDefinition
-        {
-            Id = minerJobId,
-            DisplayName = "Miner",
-            JobBlockId = minerBlock?.BlockTypeId,
-            ToolsetId = minerBlock?.ToolsetId
-        });
 
         var minerScience = database.Sciences.Any(science => science.Id.Equals("pipliz.miner", StringComparison.OrdinalIgnoreCase))
             ? "pipliz.miner"
             : null;
         foreach (var source in database.MiningSources)
         {
+            // A miner block is attached to one core resource.  Keep each output
+            // resource in its own capacity group so the result can report the
+            // required miners for that resource without duplicating shared totals.
+            var resourceJobId = $"{minerJobId}.{source.OutputItemId}";
+            Upsert(database.Jobs, job => job.Id, resourceJobId, () => new JobTypeDefinition
+            {
+                Id = resourceJobId,
+                DisplayName = $"Miner — {DisplayName.FromIdentifier(source.OutputItemId)}",
+                JobBlockId = minerBlock?.BlockTypeId,
+                ToolsetId = minerBlock?.ToolsetId
+            });
+
             var recipe = new RecipeDefinition
             {
                 Id = $"pipliz.minerjob.{source.Id}",
                 DisplayName = $"Mine {DisplayName.FromIdentifier(source.OutputItemId)} ({source.DisplayName})",
-                JobTypeId = minerJobId,
+                JobTypeId = resourceJobId,
                 CooldownSeconds = source.MiningTimeSeconds,
                 RequiredScience = minerScience,
                 SourceFile = source.SourceFile

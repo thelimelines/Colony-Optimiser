@@ -48,7 +48,7 @@ sum_(r assigned to j) C_r * effectiveWorkload(r)
     <= N_j * availableBlockMilliseconds
 ```
 
-Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle and are counted as machine blocks rather than workers. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Dedicated farm or forestry crafts also reserve their required workers explicitly.
+Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle and are counted as machine blocks rather than workers. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Mining recipes are instead grouped by mined output resource, so each resource reports its own miner requirement. Dedicated farm or forestry crafts also reserve their required workers explicitly.
 
 Simple crop farms are modelled as dedicated farm areas. Their growable stages advance once per night, so an `n`-stage crop has a growth period of `n - 1` full game cycles. Each configured field produces its harvested-tile count divided by that period; one farmer is reserved for the area. The crop source tab records field tile counts, growth, science, and expected output per game cycle.
 

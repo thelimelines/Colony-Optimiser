@@ -291,14 +291,6 @@
                 <TextBlock Text="{Binding RecipeDisplayName}" VerticalAlignment="Center" TextWrapping="Wrap" />
             </StackPanel>
         </DataTemplate>
-        <DataTemplate x:Key="VisualGraphNodeTemplate">
-            <Border Width="180" Height="58" Background="{Binding Fill}" BorderBrush="{Binding Border}" BorderThickness="1" Padding="9" ToolTip="{Binding Label}">
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Kind}" Foreground="#C6E7E4" FontSize="10" />
-                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-            </Border>
-        </DataTemplate>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -700,13 +692,14 @@
                                     <TextBlock Text="Direction" VerticalAlignment="Center" />
                                     <ComboBox Grid.Column="1" ItemsSource="{Binding NodeLayoutDirections}" SelectedItem="{Binding NodeLayoutDirection}" />
                                     <TextBlock Grid.Column="3" Text="Node spacing" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="4" Minimum="16" Maximum="160" Value="{Binding NodeSpacing}" TickFrequency="8" IsSnapToTickEnabled="True" />
+                                    <Slider Grid.Column="4" Minimum="0" Maximum="160" Value="{Binding NodeSpacing}" TickFrequency="8" IsSnapToTickEnabled="True" />
                                     <TextBox Grid.Column="5" Text="{Binding NodeSpacing, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
                                     <TextBlock Grid.Column="7" Text="Layer spacing" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="8" Minimum="48" Maximum="240" Value="{Binding LayerSpacing}" TickFrequency="12" IsSnapToTickEnabled="True" />
+                                    <Slider Grid.Column="8" Minimum="0" Maximum="240" Value="{Binding LayerSpacing}" TickFrequency="12" IsSnapToTickEnabled="True" />
                                     <TextBox Grid.Column="9" Text="{Binding LayerSpacing, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center" />
                                 </Grid>
                             </Border>
+                            <ProgressBar Height="4" Margin="0,8,0,0" IsIndeterminate="True" Foreground="#6DE0C6" Background="#1D3C41" BorderThickness="0" Visibility="{Binding IsVisualisationRendering, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         </StackPanel>
                         <Border Grid.Row="1" Background="#102025" BorderBrush="#547176" BorderThickness="1">
                             <wv2:WebView2 x:Name="SankeyWebView" />

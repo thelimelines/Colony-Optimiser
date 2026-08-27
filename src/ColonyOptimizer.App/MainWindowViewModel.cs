@@ -55,9 +55,6 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<ToolRequirement> ToolResults { get; } = [];
     public ObservableCollection<ExternalRequirement> ExternalResults { get; } = [];
     public ObservableCollection<ProductionOutput> OutputResults { get; } = [];
-    public ObservableCollection<VisualGraphNode> VisualGraphNodes { get; } = [];
-    public ObservableCollection<VisualGraphLink> VisualGraphLinks { get; } = [];
-    public ObservableCollection<GraphRootOption> GraphRoots { get; } = [];
     public ObservableCollection<string> RecentPlans { get; } = [];
     public ObservableCollection<WorldSaveOption> WorldSaveOptions { get; } = [];
 
@@ -90,7 +87,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private NodeLayoutDirection nodeLayoutDirection = NodeLayoutDirection.Right;
     [ObservableProperty] private int nodeSpacing = 44;
     [ObservableProperty] private int layerSpacing = 96;
-    [ObservableProperty] private GraphRootOption? selectedGraphRoot;
+    [ObservableProperty] private bool isVisualisationRendering;
     [ObservableProperty] private bool isBusy;
     [ObservableProperty] private decimal efficiencyPercent = 100m;
     [ObservableProperty] private decimal headroomPercent;
@@ -124,6 +121,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool IsNodeVisualiserSelected => SelectedVisualisationIndex == 1;
 
+    public string VisualisationLayoutJson => JsonSerializer.Serialize(CreateVisualisationLayout(), JsonDefaults.Options);
+
     public bool HasCoreIconAssets => _database is not null
         && new[] { "coppertools", "wheat", "alkanet" }.All(id =>
         {
@@ -147,8 +146,8 @@ public partial class MainWindowViewModel : ObservableObject
         {
             NodeLayoutDirection = savedLayoutDirection;
         }
-        NodeSpacing = Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 16, 160);
-        LayerSpacing = Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 48, 240);
+        NodeSpacing = Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 0, 160);
+        LayerSpacing = Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 0, 240);
         foreach (var recentPlanPath in _userSettings.RecentPlans.Where(File.Exists))
         {
             RecentPlans.Add(recentPlanPath);
@@ -191,17 +190,16 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsNodeVisualiserSelected));
         RefreshVisualisation();
     }
-    partial void OnSelectedGraphRootChanged(GraphRootOption? value) => RefreshVisualisation();
     partial void OnNodeLayoutDirectionChanged(NodeLayoutDirection value)
     {
         SaveVisualisationSettings();
-        RefreshVisualisation();
+        DebounceVisualisationRefresh();
     }
     partial void OnNodeSpacingChanged(int value)
     {
-        if (value is < 16 or > 160)
+        if (value is < 0 or > 160)
         {
-            NodeSpacing = Math.Clamp(value, 16, 160);
+            NodeSpacing = Math.Clamp(value, 0, 160);
             return;
         }
 
@@ -210,9 +208,9 @@ public partial class MainWindowViewModel : ObservableObject
     }
     partial void OnLayerSpacingChanged(int value)
     {
-        if (value is < 48 or > 240)
+        if (value is < 0 or > 240)
         {
-            LayerSpacing = Math.Clamp(value, 48, 240);
+            LayerSpacing = Math.Clamp(value, 0, 240);
             return;
         }
 
@@ -804,9 +802,6 @@ public partial class MainWindowViewModel : ObservableObject
         ToolResults.Clear();
         ExternalResults.Clear();
         OutputResults.Clear();
-        GraphRoots.Clear();
-        VisualGraphNodes.Clear();
-        VisualGraphLinks.Clear();
         _lastResult = null;
         ResultHeadline = "No calculation yet";
         ResultDetail = "Add production targets, configure progression, then optimise.";
@@ -1163,14 +1158,11 @@ public partial class MainWindowViewModel : ObservableObject
     private void OnVisualisationRefreshDebounceTimerTick(object? sender, EventArgs eventArgs)
     {
         _visualisationRefreshDebounceTimer.Stop();
-        RefreshVisualisation();
+        OnPropertyChanged(nameof(VisualisationLayoutJson));
     }
 
     private void RefreshVisualisation()
     {
-        VisualGraphNodes.Clear();
-        VisualGraphLinks.Clear();
-        GraphRoots.Clear();
         if (_lastResult is null || !_lastResult.IsFeasible)
         {
             SankeyGraphJson = "{\"mode\":0,\"nodes\":[],\"links\":[]}";
@@ -1198,72 +1190,18 @@ public partial class MainWindowViewModel : ObservableObject
         SankeyGraphJson = JsonSerializer.Serialize(new
         {
             mode = SelectedVisualisationIndex,
-            layout = new
-            {
-                direction = NodeLayoutDirection == NodeLayoutDirection.Down ? "DOWN" : "RIGHT",
-                nodeSpacing = NodeSpacing,
-                layerSpacing = LayerSpacing
-            },
+            layout = CreateVisualisationLayout(),
             nodes = sankeyNodes,
             links = flows.Select(flow => new { source = flow.SourceId, target = flow.TargetId, value = flow.Amount, item = flow.ItemId }).ToArray()
         }, JsonDefaults.Options);
-
-        var nodeMetadata = new Dictionary<string, (string Label, string Kind)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var flow in flows)
-        {
-            nodeMetadata.TryAdd(flow.SourceId, (flow.SourceLabel, flow.SourceKind));
-            nodeMetadata.TryAdd(flow.TargetId, (flow.TargetLabel, flow.TargetKind));
-        }
-        var layers = nodeMetadata.Keys.ToDictionary(id => id, _ => 0, StringComparer.OrdinalIgnoreCase);
-        for (var pass = 0; pass < nodeMetadata.Count; pass++)
-        {
-            foreach (var flow in flows)
-            {
-                layers[flow.TargetId] = Math.Min(nodeMetadata.Count, Math.Max(layers[flow.TargetId], layers[flow.SourceId] + 1));
-            }
-        }
-
-        var nodes = nodeMetadata.Select(entry => new VisualGraphNode(entry.Key, entry.Value.Label, entry.Value.Kind)).OrderBy(node => node.Label).ToList();
-        if (SelectedVisualisationIndex == 1)
-        {
-            var radiusX = Math.Max(220, nodes.Count * 23);
-            var radiusY = Math.Max(170, nodes.Count * 16);
-            for (var index = 0; index < nodes.Count; index++)
-            {
-                var angle = 2d * Math.PI * index / Math.Max(1, nodes.Count);
-                nodes[index].X = 480d + radiusX * Math.Cos(angle);
-                nodes[index].Y = 320d + radiusY * Math.Sin(angle);
-            }
-        }
-        else
-        {
-            foreach (var group in nodes.GroupBy(node => layers[node.Id]).OrderBy(group => group.Key))
-            {
-                var ordered = group.OrderBy(node => node.Label).ToArray();
-                for (var index = 0; index < ordered.Length; index++)
-                {
-                    ordered[index].X = 30d + group.Key * 220d;
-                    ordered[index].Y = 30d + index * 92d;
-                }
-            }
-        }
-
-        foreach (var node in nodes) VisualGraphNodes.Add(node);
-        var byId = nodes.ToDictionary(node => node.Id, StringComparer.OrdinalIgnoreCase);
-        var largestFlow = flows.Max(flow => flow.Amount);
-        foreach (var flow in flows)
-        {
-            var source = byId[flow.SourceId];
-            var target = byId[flow.TargetId];
-            VisualGraphLinks.Add(new VisualGraphLink(
-                source.X + VisualGraphNode.Width,
-                source.Y + VisualGraphNode.Height / 2d,
-                target.X,
-                target.Y + VisualGraphNode.Height / 2d,
-                SelectedVisualisationIndex == 0 ? Math.Clamp(2d + 16d * (double)(flow.Amount / largestFlow), 2d, 18d) : 2d,
-                $"{flow.ItemId}: {flow.Amount:0.##}"));
-        }
     }
+
+    private object CreateVisualisationLayout() => new
+    {
+        direction = NodeLayoutDirection == NodeLayoutDirection.Down ? "DOWN" : "RIGHT",
+        nodeSpacing = NodeSpacing,
+        layerSpacing = LayerSpacing
+    };
 
     private void RefreshRecentPlans()
     {
@@ -1634,11 +1572,6 @@ public partial class TrapRow : ObservableObject
     partial void OnCountChanged(int value) => OnPropertyChanged(nameof(FullReloadPerCycle));
 }
 
-public sealed record GraphRootOption(string Id, string DisplayName)
-{
-    public override string ToString() => DisplayName;
-}
-
 public sealed record WorldSaveOption(string Path)
 {
     public string DisplayName => $"{System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(Path))} - {Path}";
@@ -1650,26 +1583,3 @@ public enum NodeLayoutDirection
     Right,
     Down
 }
-
-public sealed class VisualGraphNode
-{
-    public const double Width = 180d;
-    public const double Height = 58d;
-
-    public VisualGraphNode(string id, string label, string kind)
-    {
-        Id = id;
-        Label = label;
-        Kind = kind;
-    }
-
-    public string Id { get; }
-    public string Label { get; }
-    public string Kind { get; }
-    public string Fill => Kind.Equals("Recipe", StringComparison.OrdinalIgnoreCase) ? "#315A4C" : "#1F5361";
-    public string Border => Kind.Equals("Recipe", StringComparison.OrdinalIgnoreCase) ? "#83D3A5" : "#75C9D8";
-    public double X { get; set; }
-    public double Y { get; set; }
-}
-
-public sealed record VisualGraphLink(double X1, double Y1, double X2, double Y2, double Thickness, string ToolTip);

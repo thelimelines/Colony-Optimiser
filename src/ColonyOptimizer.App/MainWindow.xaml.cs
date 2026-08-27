@@ -68,6 +68,8 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(userDataDirectory);
         var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDirectory);
         await SankeyWebView.EnsureCoreWebView2Async(environment);
+        SankeyWebView.CoreWebView2.WebMessageReceived -= SankeyWebViewOnWebMessageReceived;
+        SankeyWebView.CoreWebView2.WebMessageReceived += SankeyWebViewOnWebMessageReceived;
         SankeyWebView.Source = new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Visualisation", "Sankey.html"));
     }
 
@@ -110,6 +112,10 @@ public partial class MainWindow : Window
         {
             _ = RenderVisualisationAsync();
         }
+        else if (eventArgs.PropertyName == nameof(MainWindowViewModel.VisualisationLayoutJson))
+        {
+            _ = UpdateVisualisationLayoutAsync();
+        }
         else if (eventArgs.PropertyName == nameof(MainWindowViewModel.IsSettingsOpen))
         {
             // WebView2 is a native child window and otherwise renders above the WPF settings overlay.
@@ -138,6 +144,34 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SankeyWebViewOnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs eventArgs)
+    {
+        try
+        {
+            using var message = JsonDocument.Parse(eventArgs.WebMessageAsJson);
+            if (message.RootElement.ValueKind != JsonValueKind.Object
+                || !message.RootElement.TryGetProperty("type", out var type))
+            {
+                return;
+            }
+
+            switch (type.GetString())
+            {
+                case "visualisation-render-complete":
+                    _viewModel.IsVisualisationRendering = false;
+                    break;
+                case "visualisation-render-failed":
+                    _viewModel.IsVisualisationRendering = false;
+                    _viewModel.ReportVisualisationFailure();
+                    break;
+            }
+        }
+        catch (JsonException exception)
+        {
+            FileLogger.Write(exception, "visualisation-message");
+        }
+    }
+
     private async void SankeyWebViewOnNavigationCompleted(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs eventArgs)
     {
         _visualisationReady = eventArgs.IsSuccess;
@@ -156,9 +190,15 @@ public partial class MainWindow : Window
             return false;
         }
 
+        _viewModel.IsVisualisationRendering = true;
         try
         {
             await SankeyWebView.CoreWebView2.ExecuteScriptAsync($"window.setGraph({_viewModel.SankeyGraphJson});");
+            if (!_visualisationSmokeTest)
+            {
+                return true;
+            }
+
             await SankeyWebView.CoreWebView2.ExecuteScriptAsync("window.waitForGraph ? window.waitForGraph() : Promise.resolve();");
             var response = await SankeyWebView.CoreWebView2.ExecuteScriptAsync("JSON.stringify(window.getGraphState ? window.getGraphState() : null);");
             var stateJson = JsonSerializer.Deserialize<string>(response);
@@ -187,11 +227,35 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("The visualisation did not accept pan and wheel navigation input.");
             }
 
+            _viewModel.IsVisualisationRendering = false;
             return populated || !_viewModel.HasVisualisationGraph;
         }
         catch (Exception exception)
         {
+            _viewModel.IsVisualisationRendering = false;
             FileLogger.Write(exception, "visualisation-render");
+            _viewModel.ReportVisualisationFailure();
+            return false;
+        }
+    }
+
+    private async Task<bool> UpdateVisualisationLayoutAsync()
+    {
+        if (!_visualisationReady || SankeyWebView.CoreWebView2 is null || !_viewModel.HasVisualisationGraph)
+        {
+            return false;
+        }
+
+        _viewModel.IsVisualisationRendering = true;
+        try
+        {
+            await SankeyWebView.CoreWebView2.ExecuteScriptAsync($"window.setLayoutOptions({_viewModel.VisualisationLayoutJson});");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _viewModel.IsVisualisationRendering = false;
+            FileLogger.Write(exception, "visualisation-layout");
             _viewModel.ReportVisualisationFailure();
             return false;
         }
@@ -200,6 +264,8 @@ public partial class MainWindow : Window
     private async Task RunVisualisationSmokeTestAsync()
     {
         var optimisationSucceeded = await _viewModel.RunVisualisationSmokeOptimisationAsync();
+        _viewModel.NodeSpacing = 0;
+        _viewModel.LayerSpacing = 0;
         _viewModel.SelectedVisualisationIndex = 0;
         var sankeySucceeded = await RenderVisualisationAsync();
         _viewModel.SelectedVisualisationIndex = 1;

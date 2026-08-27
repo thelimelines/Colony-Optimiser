@@ -41,6 +41,24 @@
     let graphState = { hasData: false, mode: 0, nodes: 0, links: 0, panEnabled: true, wheelZoomEnabled: true };
     let renderPromise = Promise.resolve();
     let renderGeneration = 0;
+    let currentGraph = null;
+    let currentLayout = { direction: 'RIGHT', nodeSpacing: 44, layerSpacing: 96 };
+    let dragFramePending = false;
+    let pendingDragUpdate = null;
+
+    function normaliseLayout(layout) {
+      const nodeSpacing = Number(layout && layout.nodeSpacing);
+      const layerSpacing = Number(layout && layout.layerSpacing);
+      return {
+        direction: layout && layout.direction === 'DOWN' ? 'DOWN' : 'RIGHT',
+        nodeSpacing: Number.isFinite(nodeSpacing) ? Math.max(0, Math.min(160, nodeSpacing)) : 44,
+        layerSpacing: Number.isFinite(layerSpacing) ? Math.max(0, Math.min(240, layerSpacing)) : 96
+      };
+    }
+    function notifyHost(type, generation) {
+      const webview = window.chrome && window.chrome.webview;
+      if (webview) webview.postMessage({ type, generation });
+    }
 
     function showTooltip(node) {
       const jobBlock = node.jobBlock
@@ -101,6 +119,17 @@
         y: (event.clientY - bounds.top - viewTransform.y) / viewTransform.k
       };
     }
+    function scheduleDragUpdate(update) {
+      pendingDragUpdate = update;
+      if (dragFramePending) return;
+      dragFramePending = true;
+      requestAnimationFrame(() => {
+        dragFramePending = false;
+        const nextUpdate = pendingDragUpdate;
+        pendingDragUpdate = null;
+        if (nextUpdate) nextUpdate();
+      });
+    }
     function enableNodeDrag(selection, onDrag) {
       selection.each(function(node) {
         const element = this;
@@ -116,7 +145,9 @@
         element.addEventListener('pointermove', event => {
           if (!drag || drag.pointerId !== event.pointerId) return;
           const point = graphPoint(event);
-          onDrag(node, drag.x + point.x - drag.point.x, drag.y + point.y - drag.point.y);
+          const x = drag.x + point.x - drag.point.x;
+          const y = drag.y + point.y - drag.point.y;
+          scheduleDragUpdate(() => onDrag(node, x, y));
           event.preventDefault();
         });
         const endDrag = event => {
@@ -134,13 +165,14 @@
 
     function layoutSankey(data, width, height) {
       const graphData = { nodes: data.nodes.map(node => Object.assign({}, node)), links: data.links.map(link => Object.assign({}, link)) };
+      const iterations = data.nodes.length > 150 ? 8 : data.nodes.length > 60 ? 12 : 24;
       const sankey = d3.sankeyCircular()
         .nodeId(node => node.id)
         .nodeWidth(16)
         .nodePadding(22)
         .nodeAlign(d3.sankeyJustify)
         .extent([[26, 58], [width - 26, height - 58]])
-        .iterations(24);
+        .iterations(iterations);
       return { sankey, graph: sankey(graphData) };
     }
 
@@ -244,7 +276,16 @@
       const itemNodes = data.nodes.filter(node => node.kind === 'Item');
       const collapsedLinks = new Map();
       const retainedItems = new Map();
+      const incoming = new Map();
+      const outgoing = new Map();
       const epsilon = 0.0001;
+
+      data.links.forEach(link => {
+        if (!incoming.has(link.target)) incoming.set(link.target, []);
+        if (!outgoing.has(link.source)) outgoing.set(link.source, []);
+        incoming.get(link.target).push(link);
+        outgoing.get(link.source).push(link);
+      });
 
       function addLink(source, target, item, value) {
         if (value <= epsilon) return;
@@ -262,11 +303,11 @@
       }
 
       itemNodes.forEach(item => {
-        const producers = data.links
-          .filter(link => link.target === item.id && allNodesById.get(link.source)?.kind === 'Recipe')
+        const producers = (incoming.get(item.id) || [])
+          .filter(link => allNodesById.get(link.source)?.kind === 'Recipe')
           .map(link => Object.assign({}, link));
-        const consumers = data.links
-          .filter(link => link.source === item.id && allNodesById.get(link.target)?.kind === 'Recipe')
+        const consumers = (outgoing.get(item.id) || [])
+          .filter(link => allNodesById.get(link.target)?.kind === 'Recipe')
           .map(link => Object.assign({}, link));
 
         if (producers.length === 0) {
@@ -365,9 +406,10 @@
       const byId = new Map(nodes.map(node => [node.id, node]));
       const links = collapsedGraph.links.map((link, index) => Object.assign({ id: `edge-${index}` }, link));
       setNodeAppearance(nodes);
-      const layoutDirection = data.layout && data.layout.direction === 'DOWN' ? 'DOWN' : 'RIGHT';
-      const nodeSpacing = Math.max(16, Number(data.layout && data.layout.nodeSpacing) || 44);
-      const layerSpacing = Math.max(48, Number(data.layout && data.layout.layerSpacing) || 96);
+      const layoutOptions = normaliseLayout(data.layout);
+      const layoutDirection = layoutOptions.direction;
+      const nodeSpacing = layoutOptions.nodeSpacing;
+      const layerSpacing = layoutOptions.layerSpacing;
       const elk = new ELK();
       const layout = await elk.layout({
         id: 'production',
@@ -408,17 +450,41 @@
       groups.append('text').attr('class', 'detail').attr('text-anchor', 'middle').attr('y', 15)
         .text(node => node.jobBlock ? `${node.jobBlocks || 1}x ${node.jobBlock}` : node.role);
 
-      function update() {
-        groups.attr('transform', node => `translate(${node.x},${node.y})`);
-        edges.attr('d', link => pointsToPath(linkPoints(link, byId, layoutDirection)));
-        labels.attr('x', link => labelPoint(linkPoints(link, byId, layoutDirection)).x)
-          .attr('y', link => labelPoint(linkPoints(link, byId, layoutDirection)).y - 8);
+      const nodeElements = new Map();
+      const edgeElements = new Map();
+      const labelElements = new Map();
+      const incidentLinks = new Map();
+      groups.each(function(node) { nodeElements.set(node.id, d3.select(this)); });
+      edges.each(function(link) { edgeElements.set(link.id, d3.select(this)); });
+      labels.each(function(link) { labelElements.set(link.id, d3.select(this)); });
+      links.forEach(link => {
+        [link.source, link.target].forEach(id => {
+          if (!incidentLinks.has(id)) incidentLinks.set(id, []);
+          incidentLinks.get(id).push(link);
+        });
+      });
+
+      function updateLink(link) {
+        const points = linkPoints(link, byId, layoutDirection);
+        edgeElements.get(link.id).attr('d', pointsToPath(points));
+        const labelPointValue = labelPoint(points);
+        labelElements.get(link.id)
+          .attr('x', labelPointValue.x)
+          .attr('y', labelPointValue.y - 8);
       }
-      update();
+      function updateAll() {
+        groups.attr('transform', node => `translate(${node.x},${node.y})`);
+        links.forEach(updateLink);
+      }
+      function updateIncident(node) {
+        nodeElements.get(node.id).attr('transform', `translate(${node.x},${node.y})`);
+        (incidentLinks.get(node.id) || []).forEach(updateLink);
+      }
+      updateAll();
       enableNodeDrag(groups, (node, x, y) => {
         node.x = Math.max(nodeWidth / 2 + 16, x);
         node.y = Math.max(nodeHeight / 2 + 16, y);
-        update();
+        updateIncident(node);
       });
       return { originalNodeCount: data.nodes.length, collapsedItemNodes: data.nodes.length - nodes.length };
     }
@@ -459,10 +525,31 @@
       graphState.nodes = viewport.selectAll('.node').size();
       graphState.links = viewport.selectAll('.visual-link').size();
     }
-    window.setGraph = function(data) {
+    function renderCurrentGraph() {
       const generation = ++renderGeneration;
-      renderPromise = renderGraph(data, generation);
+      renderPromise = renderGraph(currentGraph, generation)
+        .then(() => {
+          if (generation === renderGeneration) notifyHost('visualisation-render-complete', generation);
+        })
+        .catch(error => {
+          if (generation === renderGeneration) notifyHost('visualisation-render-failed', generation);
+          throw error;
+        });
       return renderPromise;
+    }
+    window.setGraph = function(data) {
+      currentLayout = normaliseLayout(data && data.layout);
+      currentGraph = data ? Object.assign({}, data, { layout: currentLayout }) : null;
+      return renderCurrentGraph();
+    };
+    window.setLayoutOptions = function(options) {
+      currentLayout = normaliseLayout(Object.assign({}, currentLayout, options));
+      if (!currentGraph) {
+        notifyHost('visualisation-render-complete', renderGeneration);
+        return Promise.resolve();
+      }
+      currentGraph = Object.assign({}, currentGraph, { layout: currentLayout });
+      return renderCurrentGraph();
     };
     window.waitForGraph = () => renderPromise;
     window.resetGraphView = resetGraphView;

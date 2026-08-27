@@ -52,9 +52,15 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("function layoutSankey", source, StringComparison.Ordinal);
         Assert.Contains("nodesPerColumn", source, StringComparison.Ordinal);
         Assert.Contains("requiredHeight", source, StringComparison.Ordinal);
-        Assert.Contains(".iterations(24)", source, StringComparison.Ordinal);
+        Assert.Contains("data.nodes.length > 150 ? 8", source, StringComparison.Ordinal);
+        Assert.Contains("data.nodes.length > 60 ? 12 : 24", source, StringComparison.Ordinal);
         Assert.Contains("let renderGeneration = 0", source, StringComparison.Ordinal);
         Assert.Contains("generation !== renderGeneration", source, StringComparison.Ordinal);
+        Assert.Contains("requestAnimationFrame", source, StringComparison.Ordinal);
+        Assert.Contains("incidentLinks", source, StringComparison.Ordinal);
+        Assert.Contains("const incoming = new Map()", source, StringComparison.Ordinal);
+        Assert.Contains("const outgoing = new Map()", source, StringComparison.Ordinal);
+        Assert.Contains("window.setLayoutOptions", source, StringComparison.Ordinal);
         Assert.Contains("function resetGraphView", source, StringComparison.Ordinal);
         Assert.Contains("mode !== graphState.mode", source, StringComparison.Ordinal);
         Assert.Contains("window.resetGraphView = resetGraphView", source, StringComparison.Ordinal);
@@ -77,9 +83,18 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("NodeSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("LayerSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("NodeLayoutDirection", xaml, StringComparison.Ordinal);
+        Assert.Contains("Minimum=\"0\" Maximum=\"160\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Minimum=\"0\" Maximum=\"240\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsIndeterminate=\"True\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResetVisualisationView_Click", xaml, StringComparison.Ordinal);
         Assert.Contains("DebounceVisualisationRefresh", viewModel, StringComparison.Ordinal);
         Assert.Contains("DispatcherTimer", viewModel, StringComparison.Ordinal);
+        Assert.Contains("VisualisationLayoutJson", viewModel, StringComparison.Ordinal);
+        Assert.Contains("isVisualisationRendering", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(_userSettings.NodeSpacing ?? NodeSpacing, 0, 160)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(_userSettings.LayerSpacing ?? LayerSpacing, 0, 240)", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("VisualGraphNodes", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("VisualGraphLinks", viewModel, StringComparison.Ordinal);
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
         Assert.Contains("CropFarmLayouts", viewModel, StringComparison.Ordinal);
         Assert.Contains("TrapRows.ToList().ForEach(row => row.Count = 0)", viewModel, StringComparison.Ordinal);
@@ -99,6 +114,11 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("Environment.SpecialFolder.LocalApplicationData", source, StringComparison.Ordinal);
         Assert.Contains("MicrosoftEdgeWebview2Setup.exe", source, StringComparison.Ordinal);
         Assert.Contains("ResetVisualisationView_Click", source, StringComparison.Ordinal);
+        Assert.Contains("WebMessageReceived", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateVisualisationLayoutAsync", source, StringComparison.Ordinal);
+        Assert.Contains("if (!_visualisationSmokeTest)", source, StringComparison.Ordinal);
+        Assert.Contains("_viewModel.NodeSpacing = 0", source, StringComparison.Ordinal);
+        Assert.Contains("_viewModel.LayerSpacing = 0", source, StringComparison.Ordinal);
     }
 
     [Fact]

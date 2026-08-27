@@ -2,8 +2,8 @@
 
 Creating a version tag publishes a GitHub release; it is not a dry run. Release from a clean `main` checkout after its verification workflow has passed.
 
-1. Update `Version` in `Directory.Build.props`.
-2. Review `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `THIRD_PARTY_NOTICES.md`, and the changes since the previous release. Confirm that GitHub Private Vulnerability Reporting is enabled.
+1. Update `Version` in `Directory.Build.props` and rename the `Unreleased` section in `CHANGELOG.md` to `## [<version>] - YYYY-MM-DD`. Write concise user-facing notes for important features, fixes, compatibility changes, known limitations, and upgrade actions.
+2. Review `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `THIRD_PARTY_NOTICES.md`, `CHANGELOG.md`, and the changes since the previous release. Confirm that GitHub Private Vulnerability Reporting is enabled.
 3. Restore, test, and build locally using the commands in `CONTRIBUTING.md`.
 4. Commit the version change and any lock-file changes caused by an intentional dependency update.
 5. Create an annotated tag whose version exactly matches `Directory.Build.props`, then push it:
@@ -18,7 +18,7 @@ Creating a version tag publishes a GitHub release; it is not a dry run. Release 
 
 Published version tags and their release artefacts are immutable. If a published package is defective, fix the problem and issue a new version; do not move the tag or replace files attached to the existing release. If the workflow fails before publishing a release, correct the problem, delete the unpublished local and remote tag if necessary, then create the tag again from the corrected commit.
 
-Review the automatically generated release notes after publication. Edit them to give users a concise summary of important features, fixes, compatibility changes, known limitations, and upgrade actions; a raw commit list is not sufficient.
+The release workflow uses the matching `CHANGELOG.md` section as the GitHub release notes and refuses to publish a tag without one. Review the published notes to make sure the rendered result matches the curated entry; a raw commit list is not sufficient.
 
 The release workflow refuses malformed versions and packages into a new `artifacts` directory. The Setup EXE is the standard end-user download; the MSI supports managed deployment and the ZIP remains portable. Do not upload developer build folders, saves, or source archives as release artefacts.
 
@@ -26,6 +26,7 @@ To create the same package locally without publishing it, restore the solution a
 
 ```powershell
 .\scripts\Publish-Release.ps1 -Version <version>
+.\scripts\Test-ReleasePackages.ps1 -ArtifactRoot artifacts -Version <version>
 ```
 
-Use a clean workspace or remove the packages for that version before running the command. Inspect the ZIP, MSI, Setup EXE, and their checksum files under `artifacts`. Commit lock-file updates only when they result from an intentional dependency update.
+Use a clean workspace or remove the packages for that version before running the command. The package smoke test checks the Setup UI and embedded chain, administrative MSI deployment, and portable ZIP contents. Inspect the ZIP, MSI, Setup EXE, and their checksum files under `artifacts`. Commit lock-file updates only when they result from an intentional dependency update.

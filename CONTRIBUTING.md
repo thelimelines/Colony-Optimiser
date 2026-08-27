@@ -34,7 +34,7 @@ The test suite reads this public data but does not modify it. Do not commit game
 - `src/ColonyOptimizer.App` contains the WPF application and bundled visualisation.
 - `tests/ColonyOptimizer.Tests` contains unit, integration, and layout-regression tests.
 - `installer` and `scripts/Publish-Release.ps1` build release packages.
-- `docs` explains the [architecture](docs/ARCHITECTURE.md), [solver](docs/SOLVER_MODEL.md), [validated game-data assumptions](docs/GAME_DATA_VALIDATION.md), and [release process](docs/RELEASING.md).
+- `docs` explains the [architecture](docs/ARCHITECTURE.md), [solver](docs/SOLVER_MODEL.md), [validated game-data assumptions](docs/GAME_DATA_VALIDATION.md), and [release process](docs/RELEASING.md). [CHANGELOG.md](CHANGELOG.md) contains the curated notes published for each release.
 
 The project uses nullable reference types and implicit global usings. Follow the style of the surrounding C# and XAML; keep changes focused and add or update tests when behaviour changes. Use British English in user-facing text and documentation. Keep code identifiers unchanged when they belong to an API, file format, upstream schema, or existing `ColonyOptimizer` namespace.
 

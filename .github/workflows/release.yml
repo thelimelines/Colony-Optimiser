@@ -36,6 +36,16 @@ jobs:
           if ($tagVersion -ne $projectVersion) {
             throw "Release tag $tagVersion does not match Directory.Build.props version $projectVersion."
           }
+      - name: Verify release changelog entry
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME.TrimStart('v')
+          $heading = "## [$tagVersion]"
+
+          if (-not (Select-String -LiteralPath CHANGELOG.md -SimpleMatch $heading -Quiet)) {
+            throw "Release tag $env:GITHUB_REF_NAME has no curated CHANGELOG.md entry headed '$heading'."
+          }
       - name: Verify release tag belongs to main
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
@@ -91,6 +101,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out release source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
       - name: Download release artifact
         uses: actions/download-artifact@v8
         with:
@@ -103,4 +117,31 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           $assets = Get-ChildItem artifacts -File | ForEach-Object FullName
-          gh release create $env:TAG $assets --repo $env:GITHUB_REPOSITORY --title "Colony Optimiser $env:TAG" --generate-notes
+          $version = $env:TAG.TrimStart('v')
+          $heading = "## [$version]"
+          $lines = Get-Content CHANGELOG.md
+          $start = [Array]::IndexOf([string[]]$lines, $heading)
+          if ($start -lt 0) {
+            throw "Release tag $env:TAG has no curated CHANGELOG.md entry headed '$heading'."
+          }
+
+          $end = $lines.Count
+          for ($index = $start + 1; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -match '^## ') {
+              $end = $index
+              break
+            }
+          }
+
+          if ($end -le $start + 1) {
+            throw "Release tag $env:TAG has an empty curated CHANGELOG.md entry."
+          }
+
+          $notes = ($lines[($start + 1)..($end - 1)] -join [Environment]::NewLine).Trim()
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            throw "Release tag $env:TAG has an empty curated CHANGELOG.md entry."
+          }
+
+          $notesPath = Join-Path $PWD 'release-notes.md'
+          Set-Content -LiteralPath $notesPath -Value $notes -NoNewline -Encoding utf8
+          gh release create $env:TAG $assets --repo $env:GITHUB_REPOSITORY --title "Colony Optimiser $env:TAG" --notes-file $notesPath

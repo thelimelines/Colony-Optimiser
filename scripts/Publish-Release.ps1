@@ -50,34 +50,41 @@ function Get-ResolvedPackagePath {
     return Join-Path (Join-Path $packageRoot $PackageId.ToLowerInvariant()) $version
 }
 
-function Get-RuntimePackPath {
+function Get-PublishedRuntimePackPath {
     param(
         [Parameter(Mandatory)]
         [object]$Assets,
         [Parameter(Mandatory)]
+        [string]$PublishDirectory,
+        [Parameter(Mandatory)]
         [string]$PackageId
     )
 
+    $depsPath = Join-Path $PublishDirectory "ColonyOptimizer.deps.json"
+    if (-not (Test-Path -LiteralPath $depsPath -PathType Leaf)) {
+        throw "Published dependency manifest was not found: $depsPath"
+    }
+
+    $deps = Get-Content -LiteralPath $depsPath -Raw | ConvertFrom-Json
+    $runtimePackPrefix = "runtimepack.$PackageId/"
+    $runtimePackIds = @(
+        $deps.targets.PSObject.Properties.Value |
+            ForEach-Object { $_.PSObject.Properties | ForEach-Object { $_.Name } } |
+            Where-Object { $_.StartsWith($runtimePackPrefix, [System.StringComparison]::OrdinalIgnoreCase) } |
+            Sort-Object -Unique
+    )
+    if ($runtimePackIds.Count -ne 1) {
+        throw "Published dependency manifest must contain exactly one '$runtimePackPrefix' runtime pack; found $($runtimePackIds.Count)."
+    }
+
+    $version = $runtimePackIds[0].Substring($runtimePackPrefix.Length)
     $packageRoot = ($Assets.packageFolders.PSObject.Properties | Select-Object -First 1).Name
-    $dependency = $Assets.project.frameworks.PSObject.Properties.Value |
-        Where-Object { $null -ne $_.PSObject.Properties['downloadDependencies'] } |
-        ForEach-Object { $_.downloadDependencies } |
-        Where-Object { $_.name.Equals($PackageId, [System.StringComparison]::OrdinalIgnoreCase) } |
-        Select-Object -First 1
-    if ($null -ne $dependency) {
-        $version = ([string]$dependency.version).Trim('[', ']').Split(',')[0].Trim()
-        return Join-Path (Join-Path $packageRoot $PackageId.ToLowerInvariant()) $version
+    $runtimePackPath = Join-Path (Join-Path $packageRoot $PackageId.ToLowerInvariant()) $version
+    if (-not (Test-Path -LiteralPath $runtimePackPath -PathType Container)) {
+        throw "Runtime pack '$PackageId' version '$version' used by $depsPath was not restored at $runtimePackPath. Restore the solution with --runtime win-x64."
     }
 
-    $runtimePackRoot = Join-Path $packageRoot $PackageId.ToLowerInvariant()
-    $cachedRuntimePack = Get-ChildItem -LiteralPath $runtimePackRoot -Directory -ErrorAction SilentlyContinue |
-        Sort-Object { [Version]$_.Name } -Descending |
-        Select-Object -First 1
-    if ($null -eq $cachedRuntimePack) {
-        throw "Runtime pack '$PackageId' was not found in $assetsPath or $runtimePackRoot. Restore the solution with --runtime win-x64."
-    }
-
-    return $cachedRuntimePack.FullName
+    return $runtimePackPath
 }
 
 function Copy-ReleaseNotice {
@@ -144,8 +151,8 @@ $licenceDirectory = Join-Path $publishDirectory "LICENSES"
 New-Item -ItemType Directory -Path $licenceDirectory -Force | Out-Null
 
 $webViewPackage = Get-ResolvedPackagePath -Assets $assets -PackageId "Microsoft.Web.WebView2"
-$netCoreRuntimePack = Get-RuntimePackPath -Assets $assets -PackageId "Microsoft.NETCore.App.Runtime.win-x64"
-$windowsDesktopRuntimePack = Get-RuntimePackPath -Assets $assets -PackageId "Microsoft.WindowsDesktop.App.Runtime.win-x64"
+$netCoreRuntimePack = Get-PublishedRuntimePackPath -Assets $assets -PublishDirectory $publishDirectory -PackageId "Microsoft.NETCore.App.Runtime.win-x64"
+$windowsDesktopRuntimePack = Get-PublishedRuntimePackPath -Assets $assets -PublishDirectory $publishDirectory -PackageId "Microsoft.WindowsDesktop.App.Runtime.win-x64"
 
 Copy-ReleaseNotice -Source (Join-Path $repositoryRoot "LICENSE") -Destination (Join-Path $publishDirectory "LICENSE.txt")
 Copy-ReleaseNotice -Source (Join-Path $webViewPackage "LICENSE.txt") -Destination (Join-Path $licenceDirectory "WebView2-LICENSE.txt")
@@ -159,6 +166,7 @@ Compress-Archive -Path (Join-Path $publishDirectory "*") -DestinationPath $archi
 dotnet build $installerProjectPath `
     --configuration Release `
     --no-restore `
+    -t:Rebuild `
     --output $artifactRoot `
     "-p:Version=$normalizedVersion" `
     "-p:PublishDirectory=$publishDirectory"
@@ -174,6 +182,7 @@ if (-not (Test-Path $msiPath)) {
 dotnet build $setupProjectPath `
     --configuration Release `
     --no-restore `
+    -t:Rebuild `
     --output $artifactRoot `
     "-p:Version=$normalizedVersion" `
     "-p:MsiPath=$msiPath"

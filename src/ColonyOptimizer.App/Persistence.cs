@@ -49,26 +49,39 @@ public sealed class UserSettingsStore
         {
             return File.Exists(PathName) ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(PathName), JsonDefaults.Options) ?? new UserSettings() : new UserSettings();
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
+            FileLogger.Write(exception, "load-settings");
             return new UserSettings();
         }
     }
 
     public void Save(UserSettings settings)
     {
-        Directory.CreateDirectory(Root);
-        var temporaryPath = $"{PathName}.{Guid.NewGuid():N}.tmp";
+        string? temporaryPath = null;
         try
         {
+            Directory.CreateDirectory(Root);
+            temporaryPath = $"{PathName}.{Guid.NewGuid():N}.tmp";
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, JsonDefaults.Options));
             File.Move(temporaryPath, PathName, overwrite: true);
         }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Write(exception, "save-settings");
+        }
         finally
         {
-            if (File.Exists(temporaryPath))
+            try
             {
-                File.Delete(temporaryPath);
+                if (temporaryPath is not null && File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                FileLogger.Write(exception, "clean-up-settings");
             }
         }
     }
@@ -100,7 +113,7 @@ public static class FileLogger
                 File.Delete(oldFile);
             }
         }
-        catch (IOException)
+        catch (Exception)
         {
             // Logging must never prevent the user from seeing the original error.
         }

@@ -349,7 +349,6 @@ public sealed class ProductionOptimizerTests
         var restored = JsonSerializer.Deserialize<SavedPlanDocument>(JsonSerializer.Serialize(document));
 
         Assert.NotNull(restored);
-        Assert.Equal(SavedPlanDocument.CurrentFormatVersion, restored.FormatVersion);
         var layout = Assert.Single(restored.Plan.CropFarmLayouts).Value;
         Assert.Equal(7, layout.Width);
         Assert.Equal(7, layout.Length);
@@ -402,7 +401,6 @@ public sealed class ProductionOptimizerTests
         var document = JsonSerializer.Deserialize<SavedPlanDocument>(oldPlan);
 
         Assert.NotNull(document);
-        Assert.Equal(1, document.FormatVersion);
         Assert.Equal("Old plan", document.Plan.Name);
         Assert.Empty(document.Plan.CropFarmLayouts);
         var forestry = Assert.Single(document.Plan.ForestryLayouts).Value;
@@ -424,7 +422,7 @@ public sealed class ProductionOptimizerTests
             Settings = document.Settings,
             DataSource = document.DataSource
         }));
-        Assert.Equal(SavedPlanDocument.CurrentFormatVersion, resaved.RootElement.GetProperty("FormatVersion").GetInt32());
+        Assert.False(resaved.RootElement.TryGetProperty("FormatVersion", out _));
         var savedPlan = resaved.RootElement.GetProperty("Plan");
         Assert.False(savedPlan.TryGetProperty("CropFarmTileCounts", out _));
         Assert.False(savedPlan.GetProperty("ForestryLayouts").GetProperty("forest").TryGetProperty("TreesPerForester", out _));

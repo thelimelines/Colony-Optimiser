@@ -142,9 +142,6 @@ public sealed class TimingOverride
 
 public sealed class SavedPlanDocument
 {
-    public const int CurrentFormatVersion = 7;
-
-    public int FormatVersion { get; set; } = CurrentFormatVersion;
     public ProductionPlan Plan { get; set; } = new();
     public OptimizationSettings Settings { get; set; } = new();
     public GameDataSourceInfo? DataSource { get; set; }

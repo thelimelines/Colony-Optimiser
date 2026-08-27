@@ -73,7 +73,7 @@ The idea for Colony Optimiser was inspired by [Factory Calculator](https://facto
 
 ## For contributors
 
-Technical material is kept out of the user guide. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then see the [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), [game-data validation](docs/GAME_DATA_VALIDATION.md), and [release instructions](docs/RELEASING.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Technical material is kept out of the user guide. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then see the [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), [game-data validation](docs/GAME_DATA_VALIDATION.md), [release instructions](docs/RELEASING.md), and [changelog](CHANGELOG.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Licence
 

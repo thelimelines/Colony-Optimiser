@@ -169,6 +169,10 @@ public sealed class MainWindowLayoutTests
         var planCleanup = File.ReadAllText(Path.Combine(repository, "installer", "ColonyOptimizer.Installer", "RemoveRecordedColonyPlans.ps1"));
         var releaseSmoke = File.ReadAllText(Path.Combine(repository, "scripts", "Test-ReleasePackages.ps1"));
         var releaseScript = File.ReadAllText(Path.Combine(repository, "scripts", "Publish-Release.ps1"));
+        var persistence = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "Persistence.cs"));
+        var planModels = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.Core", "PlanModels.cs"));
+        var releasing = File.ReadAllText(Path.Combine(repository, "docs", "RELEASING.md"));
+        var changelog = File.ReadAllText(Path.Combine(repository, "CHANGELOG.md"));
 
         Assert.Contains("-Setup.exe", readme, StringComparison.Ordinal);
         Assert.Contains("-win-x64.msi", readme, StringComparison.Ordinal);
@@ -213,8 +217,20 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("Test-SetupLayout", releaseSmoke, StringComparison.Ordinal);
         Assert.Contains("Test-MsiAdministrativeInstall", releaseSmoke, StringComparison.Ordinal);
         Assert.Contains("Expand-Archive", releaseSmoke, StringComparison.Ordinal);
-        Assert.Contains("PSObject.Properties['downloadDependencies']", releaseScript, StringComparison.Ordinal);
-        Assert.Contains("Get-ChildItem -LiteralPath $runtimePackRoot", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("Get-PublishedRuntimePackPath", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("ColonyOptimizer.deps.json", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("runtimepack.$PackageId/", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("-t:Rebuild", releaseScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("Get-ChildItem -LiteralPath $runtimePackRoot", releaseScript, StringComparison.Ordinal);
+        Assert.Contains("catch (Exception)", persistence, StringComparison.Ordinal);
+        Assert.Contains("exception is JsonException or IOException or UnauthorizedAccessException", persistence, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentFormatVersion", planModels, StringComparison.Ordinal);
+        Assert.Contains("CHANGELOG.md", releasing, StringComparison.Ordinal);
+        Assert.Contains("Test-ReleasePackages.ps1", releasing, StringComparison.Ordinal);
+        Assert.Contains("CHANGELOG.md", workflow, StringComparison.Ordinal);
+        Assert.Contains("--notes-file", workflow, StringComparison.Ordinal);
+        Assert.Contains("## Unreleased", changelog, StringComparison.Ordinal);
+        Assert.Contains("## [1.0.5]", changelog, StringComparison.Ordinal);
         Assert.Contains("<Version>1.0.6</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
 
         var icon = File.ReadAllBytes(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "ColonyOptimizerLogo.ico"));

@@ -425,7 +425,11 @@ public partial class MainWindowViewModel : ObservableObject
             var settings = BuildSettings();
             var result = await Task.Run(() => _optimizer.Optimize(_database, plan, settings));
             ApplyResult(result);
-            StatusText = result.IsFeasible ? "Optimisation complete" : "No feasible plan";
+            StatusText = !result.IsFeasible
+                ? "No feasible plan"
+                : result.IsOptimal
+                    ? "Optimisation complete"
+                    : "Optimisation complete — approximate result";
         }
         catch (Exception exception)
         {
@@ -475,13 +479,13 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     public void ReportVisualisationRuntimeInstallationStarted() =>
-        StatusText = "Installing the Microsoft Edge WebView2 Runtime for visualisation...";
+        StatusText = "Downloading and installing the Microsoft Edge WebView2 Runtime for visualisation...";
 
     public void ReportVisualisationRuntimeInstalled() =>
         StatusText = "Microsoft Edge WebView2 Runtime installed; visualisation is ready";
 
     public void ReportVisualisationRuntimeUnavailable() =>
-        StatusText = "Visualisation requires the Microsoft Edge WebView2 Runtime. Re-run the installer or install it from Microsoft.";
+        StatusText = "Visualisation requires the Microsoft Edge WebView2 Runtime. Keep an internet connection and restart the app, or install it from Microsoft.";
 
     [RelayCommand]
     private async Task SavePlanAsync()
@@ -542,6 +546,7 @@ public partial class MainWindowViewModel : ObservableObject
         Targets.Clear();
         ExternalItems.Clear();
         GuardRows.ToList().ForEach(row => row.Count = 0);
+        TrapRows.ToList().ForEach(row => row.Count = 0);
         RecipeRows.ToList().ForEach(row => row.Policy = RecipePolicy.Allowed);
         SelectedPlanName = "Untitled plan";
         _currentPlanPath = null;
@@ -571,10 +576,10 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        var content = new StringBuilder("Job,Workers,Workload seconds,Capacity seconds,Utilisation percent,Selected tool\r\n");
+        var content = new StringBuilder("Job,Workers,Machine blocks,Workload seconds,Capacity seconds,Utilisation percent,Selected tool\r\n");
         foreach (var job in JobResults)
         {
-            content.AppendLine(string.Join(',', Csv(job.JobDisplayName), job.Workers, job.WorkloadSeconds.ToString(CultureInfo.InvariantCulture), job.CapacitySeconds.ToString(CultureInfo.InvariantCulture), job.UtilisationPercent.ToString(CultureInfo.InvariantCulture), Csv(job.SelectedToolId ?? string.Empty)));
+            content.AppendLine(string.Join(',', Csv(job.JobDisplayName), job.Workers, job.MachineBlocks, job.WorkloadSeconds.ToString(CultureInfo.InvariantCulture), job.CapacitySeconds.ToString(CultureInfo.InvariantCulture), job.UtilisationPercent.ToString(CultureInfo.InvariantCulture), Csv(job.SelectedToolId ?? string.Empty)));
         }
 
         content.AppendLine();
@@ -716,7 +721,14 @@ public partial class MainWindowViewModel : ObservableObject
         plan.RecipePolicies = RecipeRows
             .SelectMany(row => row.RelatedRecipeIds.Select(id => new KeyValuePair<string, RecipePolicy>(id, row.Policy)))
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+        // Keep the legacy tile count in sync for backwards compatibility, but save
+        // the authoritative shape so reopening a plan cannot change its area.
         plan.CropFarmTileCounts = CropSourceRows.ToDictionary(row => row.Id, row => Math.Max(1, row.FieldTiles), StringComparer.OrdinalIgnoreCase);
+        plan.CropFarmLayouts = CropSourceRows.ToDictionary(row => row.Id, row => new CropFarmLayout
+        {
+            Width = Math.Max(1, row.FieldWidth),
+            Length = Math.Max(1, row.FieldLength)
+        }, StringComparer.OrdinalIgnoreCase);
         plan.ForestryLayouts = ForestrySourceRows.ToDictionary(row => row.Id, row => new ForestryLayout
         {
             ForesterCount = Math.Max(1, row.ForesterCount),
@@ -745,7 +757,7 @@ public partial class MainWindowViewModel : ObservableObject
         ToolResults.Clear();
         ExternalResults.Clear();
         OutputResults.Clear();
-        foreach (var job in result.JobRequirements.OrderByDescending(job => job.Workers)) JobResults.Add(job);
+        foreach (var job in result.JobRequirements.OrderByDescending(job => job.BlockCount)) JobResults.Add(job);
         foreach (var allocation in result.RecipeAllocations.OrderBy(allocation => allocation.JobTypeId).ThenBy(allocation => allocation.RecipeId))
         {
             allocation.IconPath = _database?.Recipes.FirstOrDefault(recipe => recipe.Id.Equals(allocation.RecipeId, StringComparison.OrdinalIgnoreCase))?.Outputs
@@ -769,8 +781,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (result.IsFeasible)
         {
-            ResultHeadline = $"{result.TotalWorkers:N0} production workers/job blocks";
-            ResultDetail = $"{result.JobRequirements.Count} job types | {result.RecipeAllocations.Count(allocation => allocation.IsAutomatedQueue)} queued machine outputs | {result.TotalOutputs.Count} planned outputs | {result.ExternalRequirements.Count} external inputs | cycle {EffectiveTiming.CycleSeconds / 60m:0.##} minutes";
+            var exactness = result.IsOptimal ? string.Empty : " (approximate)";
+            ResultHeadline = $"{result.TotalWorkers:N0} production workers + {result.TotalMachineBlocks:N0} machine blocks{exactness}";
+            ResultDetail = $"{result.JobRequirements.Count} job types | {result.RecipeAllocations.Count(allocation => allocation.IsAutomatedQueue)} queued machine outputs | {result.TotalOutputs.Count} planned outputs | {result.ExternalRequirements.Count} external inputs | solver {result.SolverStatus} | cycle {EffectiveTiming.CycleSeconds / 60m:0.##} minutes";
         }
         else
         {
@@ -862,9 +875,19 @@ public partial class MainWindowViewModel : ObservableObject
         foreach (var tool in ToolRows) tool.IsSelected = plan.AvailableTools.Contains(tool.Id);
         foreach (var cropSource in CropSourceRows)
         {
-            var tiles = plan.CropFarmTileCounts.GetValueOrDefault(cropSource.Id, cropSource.DefaultFieldTiles);
-            cropSource.FieldWidth = 10;
-            cropSource.FieldLength = Math.Max(1, (int)Math.Ceiling(tiles / 10m));
+            var layout = plan.CropFarmLayouts.GetValueOrDefault(cropSource.Id);
+            if (layout is not null && layout.Width > 0 && layout.Length > 0)
+            {
+                cropSource.FieldWidth = layout.Width;
+                cropSource.FieldLength = layout.Length;
+                continue;
+            }
+
+            // Legacy plan files only have a tile count. A one-by-N field retains
+            // that exact area instead of silently rounding it up to a ten-wide plot.
+            var tiles = Math.Max(1, plan.CropFarmTileCounts.GetValueOrDefault(cropSource.Id, cropSource.DefaultFieldTiles));
+            cropSource.FieldWidth = 1;
+            cropSource.FieldLength = tiles;
         }
         foreach (var forestrySource in ForestrySourceRows)
         {
@@ -912,7 +935,7 @@ public partial class MainWindowViewModel : ObservableObject
     private string BuildClipboardSummary()
     {
         var summary = new StringBuilder("Colony production plan\r\n\r\n");
-        foreach (var job in JobResults) summary.AppendLine($"{job.Workers} x {job.JobDisplayName}");
+        foreach (var job in JobResults) summary.AppendLine($"{job.BlockCount} x {job.JobDisplayName}{(job.IsAutomatedQueue ? " (machine)" : string.Empty)}");
         if (OutputResults.Count > 0)
         {
             summary.AppendLine("\r\nTotal outputs:");
@@ -1247,14 +1270,14 @@ public partial class MainWindowViewModel : ObservableObject
             return null;
         }
 
-        if (!jobRequirementsById.TryGetValue(allocation.JobTypeId, out var requirement) || requirement.Workers <= 0)
+        if (!jobRequirementsById.TryGetValue(allocation.JobTypeId, out var requirement) || requirement.BlockCount <= 0)
         {
-            return allocation.IsAutomatedQueue && allocation.CraftsPerCycle > 0 ? 1 : null;
+            return null;
         }
 
-        var capacityPerBlock = requirement.CapacitySeconds / requirement.Workers;
+        var capacityPerBlock = requirement.CapacitySeconds / requirement.BlockCount;
         return capacityPerBlock <= 0m
-            ? requirement.Workers
+            ? requirement.BlockCount
             : Math.Max(1L, (long)Math.Ceiling(allocation.WorkloadSeconds / capacityPerBlock));
     }
 
@@ -1415,7 +1438,7 @@ public partial class ForestrySourceRow : ObservableObject
     [ObservableProperty] private int plotWidth;
     [ObservableProperty] private int plotLength;
 
-    private int TotalTrees => Math.Max(0, PlotWidth / 3) * Math.Max(0, PlotLength / 3);
+    private int TotalTrees => ForestryLayout.GetTreeSlotCount(PlotWidth, PlotLength);
     private int HarvestedTrees => Math.Min(TotalTrees, Math.Max(1, ForesterCount) * _source.TreesPerForesterPerCycle);
     private static string DisplayNameFromId(string id) => ColonyOptimizer.Core.DisplayName.FromIdentifier(id);
 

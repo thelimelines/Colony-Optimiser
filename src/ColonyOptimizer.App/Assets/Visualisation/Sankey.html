@@ -123,16 +123,37 @@
       selection.selectAll('.node').attr('transform', d => `translate(${d.x0},${d.y0})`);
     }
 
-    function renderSankey(data, width, height) {
+    function layoutSankey(data, width, height) {
       const graphData = { nodes: data.nodes.map(node => Object.assign({}, node)), links: data.links.map(link => Object.assign({}, link)) };
       const sankey = d3.sankeyCircular()
         .nodeId(node => node.id)
         .nodeWidth(16)
-        .nodePadding(18)
+        .nodePadding(22)
         .nodeAlign(d3.sankeyJustify)
         .extent([[26, 58], [width - 26, height - 58]])
         .iterations(48);
-      const graph = sankey(graphData);
+      return { sankey, graph: sankey(graphData) };
+    }
+
+    function renderSankey(data, width, availableHeight) {
+      // In a large optimisation several recipes legitimately share one Sankey
+      // column. A fixed viewport height made their node rectangles almost zero
+      // pixels tall, while labels remained full-sized and hid their connections.
+      // Lay the graph out in a virtual, pannable canvas with one readable slot per
+      // node in the busiest column, then rerun the layout at that height.
+      let height = availableHeight;
+      let { sankey, graph } = layoutSankey(data, width, height);
+      const columnCounts = new Map();
+      graph.nodes.forEach(node => {
+        const column = Math.round(node.x0);
+        columnCounts.set(column, (columnCounts.get(column) || 0) + 1);
+      });
+      const nodesPerColumn = Math.max(1, ...Array.from(columnCounts.values()));
+      const requiredHeight = 116 + nodesPerColumn * 58;
+      if (requiredHeight > height) {
+        height = requiredHeight;
+        ({ sankey, graph } = layoutSankey(data, width, height));
+      }
       const links = viewport.append('g').selectAll('path').data(graph.links).enter().append('path')
         .attr('class', 'link visual-link')
         .attr('d', link => link.path)
@@ -346,7 +367,10 @@
       graphState = { hasData: !!hasData, mode, nodes: 0, links: 0, panEnabled: true, wheelZoomEnabled: true, layoutEngine: mode === 1 ? 'elk-layered' : 'sankey-circular' };
       if (!hasData) return;
       const width = Math.max(1000, svg.node().getBoundingClientRect().width || 1000);
-      if (data.mode === 0) renderSankey(data, width, Math.max(640, svg.node().getBoundingClientRect().height || 640));
+      if (data.mode === 0) {
+        const contentHeight = Math.max(640, svg.node().getBoundingClientRect().height || 640);
+        renderSankey(data, width, contentHeight);
+      }
       else Object.assign(graphState, await renderNodeVisualiser(data));
       graphState.nodes = viewport.selectAll('.node').size();
       graphState.links = viewport.selectAll('.visual-link').size();

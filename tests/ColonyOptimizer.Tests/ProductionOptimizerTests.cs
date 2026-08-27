@@ -2,6 +2,7 @@ using ColonyOptimizer.Core;
 using ColonyOptimizer.GameData;
 using ColonyOptimizer.Optimization;
 using Microsoft.Data.Sqlite;
+using System.Text.Json;
 
 namespace ColonyOptimizer.Tests;
 
@@ -82,6 +83,120 @@ public sealed class ProductionOptimizerTests
         Assert.True(result.IsFeasible);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
         Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
+    }
+
+    [Theory]
+    [InlineData(72, 1)]
+    [InlineData(73, 2)]
+    [InlineData(720, 10)]
+    public void limits_automated_machine_throughput_by_full_cycle_capacity(decimal demand, long expectedMachines)
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Recipes.Add(Recipe("machine-widget", "machine", 10m, "widget"));
+
+        var result = new ProductionOptimizer().Optimize(database, Plan(("widget", demand)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.True(result.IsOptimal);
+        Assert.Equal(0, result.TotalWorkers);
+        Assert.Equal(expectedMachines, result.TotalMachineBlocks);
+        var machine = Assert.Single(result.JobRequirements);
+        Assert.True(machine.IsAutomatedQueue);
+        Assert.Equal(0, machine.Workers);
+        Assert.Equal(expectedMachines, machine.MachineBlocks);
+    }
+
+    [Fact]
+    public void shares_automated_machine_capacity_between_queued_recipes()
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Recipes.Add(Recipe("machine-a", "machine", 10m, "a"));
+        database.Recipes.Add(Recipe("machine-b", "machine", 20m, "b"));
+
+        var result = new ProductionOptimizer().Optimize(database, Plan(("a", 36m), ("b", 18m)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(1, Assert.Single(result.JobRequirements).MachineBlocks);
+    }
+
+    [Theory]
+    [InlineData(2, 100, 0)]
+    [InlineData(5, 5, 1)]
+    [InlineData(4, 8, 2)]
+    public void forestry_uses_physical_three_by_three_tree_slots(int width, int length, int expectedTrees)
+    {
+        var database = CreateDatabase(activeSeconds: 720m);
+        database.ForestrySources.Add(new ForestrySourceDefinition
+        {
+            Id = "forest",
+            DisplayName = "Forest",
+            JobTypeId = "worker",
+            LogItemId = "logs",
+            LeavesItemId = "leaves",
+            TreesPerForesterPerCycle = 100,
+            LogsPerTree = 1,
+            LeavesPerTree = 1,
+            WorkSecondsPerForesterCycle = 1m
+        });
+        var plan = Plan(("logs", Math.Max(1, expectedTrees)));
+        plan.ForestryLayouts["forest"] = new ForestryLayout { ForesterCount = 1, PlotWidth = width, PlotLength = length };
+
+        var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
+
+        Assert.Equal(expectedTrees > 0, result.IsFeasible);
+        if (expectedTrees > 0)
+        {
+            Assert.Equal(expectedTrees, result.TotalOutputs.Single(output => output.ItemId == "logs").PerCycle);
+        }
+    }
+
+    [Fact]
+    public void preserves_crop_field_dimensions_through_plan_json_round_trip()
+    {
+        var document = new SavedPlanDocument
+        {
+            Plan = new ProductionPlan
+            {
+                CropFarmTileCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["crop"] = 49 },
+                CropFarmLayouts = new Dictionary<string, CropFarmLayout>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["crop"] = new CropFarmLayout { Width = 7, Length = 7 }
+                }
+            }
+        };
+
+        var restored = JsonSerializer.Deserialize<SavedPlanDocument>(JsonSerializer.Serialize(document));
+
+        Assert.NotNull(restored);
+        var layout = Assert.Single(restored.Plan.CropFarmLayouts).Value;
+        Assert.Equal(7, layout.Width);
+        Assert.Equal(7, layout.Length);
+        Assert.Equal(49, restored.Plan.CropFarmTileCounts["crop"]);
+    }
+
+    [Fact]
+    public void uses_saved_crop_dimensions_in_preference_to_legacy_tile_count()
+    {
+        var database = CreateDatabase(activeSeconds: 720m);
+        var crop = new CropFarmSourceDefinition
+        {
+            Id = "crop",
+            DisplayName = "Crop",
+            JobTypeId = "worker",
+            GrowthCyclesPerHarvest = 1m
+        };
+        crop.Outputs.Add(new ItemAmount("produce", 1m));
+        database.CropFarmSources.Add(crop);
+        var plan = Plan(("produce", 49m));
+        plan.CropFarmTileCounts["crop"] = 1;
+        plan.CropFarmLayouts["crop"] = new CropFarmLayout { Width = 7, Length = 7 };
+
+        var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(49m, result.TotalOutputs.Single(output => output.ItemId == "produce").PerCycle);
     }
 
     [Fact]

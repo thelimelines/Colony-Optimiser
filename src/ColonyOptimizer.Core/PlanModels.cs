@@ -73,7 +73,10 @@ public sealed class ProductionPlan
     public HashSet<string> UnlockedSciences { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> AvailableTools { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, RecipePolicy> RecipePolicies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    // CropFarmTileCounts is retained so plans written by newer versions can still be
+    // opened by v0.5 and earlier. CropFarmLayouts is authoritative when present.
     public Dictionary<string, int> CropFarmTileCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, CropFarmLayout> CropFarmLayouts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, ForestryLayout> ForestryLayouts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> ExternalItems { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<GuardAssignment> Guards { get; set; } = [];
@@ -99,6 +102,15 @@ public sealed class ForestryLayout
 
     // Kept for existing v0.2 plan files. New plans use the physical plot dimensions.
     public int TreesPerForester { get; set; }
+
+    public static int GetTreeSlotCount(int width, int length) =>
+        Math.Max(0, width / 3) * Math.Max(0, length / 3);
+}
+
+public sealed class CropFarmLayout
+{
+    public int Width { get; set; } = 1;
+    public int Length { get; set; } = 1;
 }
 
 public sealed class TimingOverride
@@ -136,7 +148,7 @@ public sealed class TimingOverride
 
 public sealed class SavedPlanDocument
 {
-    public int FormatVersion { get; set; } = 5;
+    public int FormatVersion { get; set; } = 6;
     public ProductionPlan Plan { get; set; } = new();
     public OptimizationSettings Settings { get; set; } = new();
     public GameDataSourceInfo? DataSource { get; set; }

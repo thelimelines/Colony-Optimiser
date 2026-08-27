@@ -39,7 +39,7 @@ public partial class MainWindow : Window
             FileLogger.Write(exception, "visualisation-webview");
             _viewModel.ReportVisualisationRuntimeUnavailable();
 
-            if (await InstallBundledWebViewRuntimeAsync())
+            if (await InstallBundledWebView2BootstrapperAsync())
             {
                 try
                 {
@@ -71,12 +71,12 @@ public partial class MainWindow : Window
         SankeyWebView.Source = new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "Visualisation", "Sankey.html"));
     }
 
-    private async Task<bool> InstallBundledWebViewRuntimeAsync()
+    private async Task<bool> InstallBundledWebView2BootstrapperAsync()
     {
         var installerPath = Path.Combine(
             AppContext.BaseDirectory,
             "Dependencies",
-            "MicrosoftEdgeWebView2RuntimeInstallerX64.exe");
+            "MicrosoftEdgeWebview2Setup.exe");
         if (!File.Exists(installerPath))
         {
             return false;

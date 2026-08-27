@@ -1,7 +1,6 @@
 <Project Sdk="WixToolset.Sdk/5.0.0">
   <ItemGroup>
     <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="5.0.0" />
-    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.0" />
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Bundle</OutputType>
@@ -9,7 +8,6 @@
     <InstallerPlatform>x64</InstallerPlatform>
     <SuppressPdbOutput>true</SuppressPdbOutput>
     <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\ColonyOptimizer-$(Version)-win-x64.msi</MsiPath>
-    <WebView2RuntimeInstallerPath Condition="'$(WebView2RuntimeInstallerPath)' == ''">$(MSBuildProjectDirectory)\..\..\artifacts\publish\Dependencies\MicrosoftEdgeWebView2RuntimeInstallerX64.exe</WebView2RuntimeInstallerPath>
-    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);MsiPath=$(MsiPath);WebView2RuntimeInstallerPath=$(WebView2RuntimeInstallerPath)</DefineConstants>
+    <DefineConstants>Version=$(Version);ProductDisplayName=$(ProductDisplayName);ProductPublisher=$(ProductPublisher);MsiPath=$(MsiPath)</DefineConstants>
   </PropertyGroup>
 </Project>

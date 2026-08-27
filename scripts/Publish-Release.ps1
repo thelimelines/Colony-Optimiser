@@ -27,8 +27,8 @@ $archivePath = Join-Path $artifactRoot "$packageName.zip"
 $msiPath = Join-Path $artifactRoot "$packageName.msi"
 $setupPath = Join-Path $artifactRoot "ColonyOptimizer-$normalizedVersion-Setup.exe"
 $assetsPath = Join-Path (Split-Path -Parent $projectPath) "obj\project.assets.json"
-$webViewRuntimeInstallerPath = Join-Path $publishDirectory "Dependencies\MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-$webViewRuntimeInstallerUri = "https://go.microsoft.com/fwlink/p/?LinkId=2124701"
+$webViewBootstrapperPath = Join-Path $publishDirectory "Dependencies\MicrosoftEdgeWebview2Setup.exe"
+$webViewBootstrapperUri = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 
 function Get-ResolvedPackagePath {
     param(
@@ -85,18 +85,18 @@ function Copy-ReleaseNotice {
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
 
-function Get-WebView2RuntimeInstaller {
+function Get-WebView2Bootstrapper {
     param(
         [Parameter(Mandatory)]
         [string]$Destination
     )
 
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    Invoke-WebRequest -Uri $webViewRuntimeInstallerUri -OutFile $Destination
+    Invoke-WebRequest -Uri $webViewBootstrapperUri -OutFile $Destination
 
     $signature = Get-AuthenticodeSignature -FilePath $Destination
     if ($signature.Status -ne "Valid" -or $signature.SignerCertificate.Subject -notmatch "Microsoft Corporation") {
-        throw "The downloaded WebView2 Runtime installer did not have a valid Microsoft Corporation signature."
+        throw "The downloaded WebView2 bootstrapper did not have a valid Microsoft Corporation signature."
     }
 }
 
@@ -120,10 +120,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }
 
-# The standalone installer keeps the MSI, Setup EXE, and portable ZIP usable on
-# Windows images that do not include the WebView2 Runtime. The Setup EXE runs it
-# before the MSI; the app can run the same bundled installer for MSI/ZIP installs.
-Get-WebView2RuntimeInstaller -Destination $webViewRuntimeInstallerPath
+# Keep the small online bootstrapper beside the app. It is used only when
+# WebView2 is absent, by Setup/MSI/ZIP installs alike. The Setup EXE embeds the
+# MSI only, so this avoids packing a second copy of the prerequisite.
+Get-WebView2Bootstrapper -Destination $webViewBootstrapperPath
 
 if (-not (Test-Path -LiteralPath $assetsPath -PathType Leaf)) {
     throw "NuGet assets file was not found: $assetsPath"
@@ -166,8 +166,7 @@ dotnet build $setupProjectPath `
     --no-restore `
     --output $artifactRoot `
     "-p:Version=$normalizedVersion" `
-    "-p:MsiPath=$msiPath" `
-    "-p:WebView2RuntimeInstallerPath=$webViewRuntimeInstallerPath"
+    "-p:MsiPath=$msiPath"
 
 if ($LASTEXITCODE -ne 0) {
     throw "Setup EXE build failed with exit code $LASTEXITCODE."

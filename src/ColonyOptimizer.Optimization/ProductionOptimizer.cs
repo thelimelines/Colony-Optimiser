@@ -40,16 +40,25 @@ public sealed class ProductionOptimizer
         var jobCapacities = eligibility.Recipes
             .GroupBy(recipe => recipe.JobTypeId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => ResolveJobCapacity(database, plan, settings, timing, group.Key), StringComparer.OrdinalIgnoreCase);
-        var workerVariables = jobCapacities.ToDictionary(
+        // A job block is either a worker-operated job or an automated machine. Both
+        // need a capacity variable, but only the former contributes to worker count.
+        var jobBlockVariables = jobCapacities.ToDictionary(
             entry => entry.Key,
-            entry => model.NewIntVar(0, entry.Value.IsAutomatedQueue ? 0 : settings.MaxWorkersPerJob, $"workers_{Sanitize(entry.Key)}"),
+            entry => model.NewIntVar(0, settings.MaxWorkersPerJob, $"job_blocks_{Sanitize(entry.Key)}"),
             StringComparer.OrdinalIgnoreCase);
 
         AddSelectedToolsWithoutProducers(availableRecipes, jobCapacities, externalItems);
         AddMaterialConstraints(model, settings.StochasticOutputPolicy, demand, externalItems, eligibility.Recipes, craftVariables, jobCapacities);
-        AddWorkloadConstraints(model, eligibility.Recipes, craftVariables, workerVariables, jobCapacities);
+        AddWorkloadConstraints(model, eligibility.Recipes, craftVariables, jobBlockVariables, jobCapacities);
 
-        var totalWorkers = CreateMetric(model, workerVariables.Values, Enumerable.Repeat(1L, workerVariables.Count));
+        var totalWorkers = CreateMetric(
+            model,
+            jobBlockVariables.Where(entry => !jobCapacities[entry.Key].IsAutomatedQueue).Select(entry => entry.Value),
+            jobBlockVariables.Where(entry => !jobCapacities[entry.Key].IsAutomatedQueue).Select(_ => 1L));
+        var totalMachineBlocks = CreateMetric(
+            model,
+            jobBlockVariables.Where(entry => jobCapacities[entry.Key].IsAutomatedQueue).Select(entry => entry.Value),
+            jobBlockVariables.Where(entry => jobCapacities[entry.Key].IsAutomatedQueue).Select(_ => 1L));
         var preferencePenalty = CreateMetric(
             model,
             craftVariables.Where(entry => plan.RecipePolicies.GetValueOrDefault(entry.Key) != RecipePolicy.Preferred && plan.RecipePolicies.GetValueOrDefault(entry.Key) != RecipePolicy.Forced).Select(entry => entry.Value),
@@ -73,14 +82,21 @@ public sealed class ProductionOptimizer
 
         var solver = new CpSolver { StringParameters = "max_time_in_seconds: 20 num_search_workers: 8" };
         using var cancellationRegistration = cancellationToken.Register(solver.StopSearch);
-        var status = SolveLexicographically(model, solver, settings.Objective, totalWorkers, preferencePenalty, rawConsumption, workload);
+        var status = SolveLexicographically(model, solver, settings.Objective, totalWorkers, totalMachineBlocks, preferencePenalty, rawConsumption, workload);
+        result.SolverStatus = status.ToString();
+        result.IsOptimal = status == CpSolverStatus.Optimal;
         if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
         {
             result.Messages.Add(new OptimizationMessage(OptimizationMessageSeverity.Error, BuildInfeasibleExplanation(demand, eligibility.Recipes, externalItems)));
             return result;
         }
 
-        PopulateResult(database, plan, timing, settings.StochasticOutputPolicy, demand, externalItems, eligibility.Recipes, craftVariables, workerVariables, jobCapacities, solver, result);
+        if (!result.IsOptimal)
+        {
+            result.Messages.Add(new OptimizationMessage(OptimizationMessageSeverity.Warning, "The solver reached its time limit before proving an optimum. This is a feasible approximate result."));
+        }
+
+        PopulateResult(database, plan, timing, settings.StochasticOutputPolicy, demand, externalItems, eligibility.Recipes, craftVariables, jobBlockVariables, jobCapacities, solver, result);
         result.IsFeasible = true;
         return result;
     }
@@ -141,7 +157,10 @@ public sealed class ProductionOptimizer
     {
         foreach (var source in database.CropFarmSources)
         {
-            var fieldTiles = Math.Max(1, plan.CropFarmTileCounts.GetValueOrDefault(source.Id, source.DefaultFieldTiles));
+            var savedLayout = plan.CropFarmLayouts.GetValueOrDefault(source.Id);
+            var fieldTiles = savedLayout is not null
+                ? Math.Max(1, savedLayout.Width) * Math.Max(1, savedLayout.Length)
+                : Math.Max(1, plan.CropFarmTileCounts.GetValueOrDefault(source.Id, source.DefaultFieldTiles));
             if (source.GrowthCyclesPerHarvest <= 0m || source.Outputs.Count == 0)
             {
                 continue;
@@ -179,7 +198,7 @@ public sealed class ProductionOptimizer
             var legacyTreeCount = Math.Max(0, layout.TreesPerForester);
             var totalTrees = legacyTreeCount > 0
                 ? legacyTreeCount
-                : Math.Max(1, layout.PlotWidth) * Math.Max(1, layout.PlotLength) / 9;
+                : ForestryLayout.GetTreeSlotCount(layout.PlotWidth, layout.PlotLength);
             var harvestCapacity = foresters * source.TreesPerForesterPerCycle;
             var harvestedTrees = Math.Min(totalTrees, harvestCapacity);
             var workersRequired = Math.Max(1, (int)Math.Ceiling(harvestedTrees / (decimal)source.TreesPerForesterPerCycle));
@@ -372,16 +391,13 @@ public sealed class ProductionOptimizer
         foreach (var group in recipes.GroupBy(recipe => recipe.JobTypeId, StringComparer.OrdinalIgnoreCase))
         {
             var capacity = capacities[group.Key];
-            if (capacity.IsAutomatedQueue)
-            {
-                continue;
-            }
-
             var crafts = group.Select(recipe => craftVariables[recipe.Id]).ToArray();
             var milliseconds = group.Select(recipe => EffectiveWorkloadMilliseconds(recipe, capacity)).ToArray();
             model.Add(CreateExpression(model, crafts, milliseconds) <= workerVariables[group.Key] * capacity.AvailableMillisecondsPerWorker);
 
-            var dedicatedCrafts = group.Where(recipe => recipe.DedicatedWorkersPerCraft > 0).ToArray();
+            var dedicatedCrafts = capacity.IsAutomatedQueue
+                ? []
+                : group.Where(recipe => recipe.DedicatedWorkersPerCraft > 0).ToArray();
             if (dedicatedCrafts.Length > 0)
             {
                 model.Add(CreateExpression(
@@ -395,7 +411,11 @@ public sealed class ProductionOptimizer
     private static JobCapacity ResolveJobCapacity(GameDatabase database, ProductionPlan plan, OptimizationSettings settings, GameTiming timing, string jobTypeId)
     {
         var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(jobTypeId, StringComparison.OrdinalIgnoreCase));
-        var activeSeconds = job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
+        // Queued machines run for the whole game cycle; worker-active time applies
+        // only to colonists operating a job block.
+        var activeSeconds = job?.IsAutomatedQueue == true
+            ? timing.CycleSeconds
+            : job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
         var availableMilliseconds = (long)Math.Floor(activeSeconds * MillisecondsPerSecond * Math.Clamp(settings.EfficiencyPercent, 0m, 100m) / 100m * (100m - Math.Clamp(settings.HeadroomPercent, 0m, 50m)) / 100m);
         var toolset = database.Toolsets.FirstOrDefault(candidate => candidate.Id.Equals(job?.ToolsetId, StringComparison.OrdinalIgnoreCase));
         var candidates = (toolset?.UsableTools ?? []).Where(plan.AvailableTools.Contains)
@@ -414,13 +434,13 @@ public sealed class ProductionOptimizer
             job?.IsAutomatedQueue ?? false);
     }
 
-    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric totalWorkers, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
+    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
     {
         var order = objective == OptimizationObjective.PreferredRecipesFirst
-            ? new[] { preferences, totalWorkers, workload }
+            ? new[] { preferences, totalWorkers, totalMachineBlocks, workload }
             : objective == OptimizationObjective.LowestRawResourceConsumption
-                ? new[] { rawConsumption, totalWorkers, preferences, workload }
-                : new[] { totalWorkers, preferences, workload };
+                ? new[] { rawConsumption, totalWorkers, totalMachineBlocks, preferences, workload }
+                : new[] { totalWorkers, totalMachineBlocks, preferences, workload };
 
         CpSolverStatus status = CpSolverStatus.Unknown;
         foreach (var metric in order)
@@ -428,6 +448,13 @@ public sealed class ProductionOptimizer
             model.Minimize(metric.Expression);
             status = solver.Solve(model);
             if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
+            {
+                return status;
+            }
+
+            // A feasible incumbent has not proved this objective's optimum. Freezing
+            // it would exclude better primary solutions from later objective stages.
+            if (status != CpSolverStatus.Optimal)
             {
                 return status;
             }
@@ -525,7 +552,9 @@ public sealed class ProductionOptimizer
             {
                 JobTypeId = job.Key,
                 JobDisplayName = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(job.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
-                Workers = workers,
+                Workers = capacity.IsAutomatedQueue ? 0 : workers,
+                MachineBlocks = capacity.IsAutomatedQueue ? workers : 0,
+                IsAutomatedQueue = capacity.IsAutomatedQueue,
                 WorkloadSeconds = workloadSeconds,
                 CapacitySeconds = workers * capacity.AvailableMillisecondsPerWorker / (decimal)MillisecondsPerSecond,
                 UtilisationPercent = workers == 0 || capacity.AvailableMillisecondsPerWorker == 0 ? 0m : workloadSeconds / (workers * capacity.AvailableMillisecondsPerWorker / (decimal)MillisecondsPerSecond) * 100m,
@@ -535,7 +564,7 @@ public sealed class ProductionOptimizer
                     : database.Tools.FirstOrDefault(candidate => candidate.Id.Equals(capacity.SelectedToolId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(capacity.SelectedToolId)
             });
 
-            if (capacity.IsConsumableTool)
+            if (!capacity.IsAutomatedQueue && capacity.IsConsumableTool)
             {
                 var toolId = capacity.SelectedToolId!;
                 var tool = database.Tools.FirstOrDefault(candidate => candidate.Id.Equals(toolId, StringComparison.OrdinalIgnoreCase));
@@ -643,6 +672,8 @@ public sealed class ProductionOptimizer
 public sealed class OptimizationResult
 {
     public bool IsFeasible { get; set; }
+    public bool IsOptimal { get; set; }
+    public string SolverStatus { get; set; } = "Not started";
     public Dictionary<string, DemandBreakdown> Demand { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<OptimizationMessage> Messages { get; } = [];
     public List<JobRequirement> JobRequirements { get; } = [];
@@ -652,6 +683,8 @@ public sealed class OptimizationResult
     public List<ProductionOutput> TotalOutputs { get; } = [];
     public List<ProductionFlow> ProductionFlows { get; } = [];
     public long TotalWorkers => JobRequirements.Sum(requirement => requirement.Workers);
+    public long TotalMachineBlocks => JobRequirements.Sum(requirement => requirement.MachineBlocks);
+    public long TotalJobBlocks => TotalWorkers + TotalMachineBlocks;
 }
 
 public enum OptimizationMessageSeverity
@@ -677,6 +710,9 @@ public sealed class JobRequirement
     public string JobTypeId { get; set; } = string.Empty;
     public string JobDisplayName { get; set; } = string.Empty;
     public long Workers { get; set; }
+    public long MachineBlocks { get; set; }
+    public bool IsAutomatedQueue { get; set; }
+    public long BlockCount => IsAutomatedQueue ? MachineBlocks : Workers;
     public decimal WorkloadSeconds { get; set; }
     public decimal CapacitySeconds { get; set; }
     public decimal UtilisationPercent { get; set; }

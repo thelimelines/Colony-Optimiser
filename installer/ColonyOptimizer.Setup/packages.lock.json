@@ -7,12 +7,6 @@
         "requested": "[5.0.0, )",
         "resolved": "5.0.0",
         "contentHash": "Ixcm845QNZjQoSDM7Hnj60/S21HTotKKre5batp0Tu6Zz3IeDRbe0GOssWhqYK4XEy7dfbfUNHEphYkERoKbdw=="
-      },
-      "WixToolset.Util.wixext": {
-        "type": "Direct",
-        "requested": "[5.0.0, )",
-        "resolved": "5.0.0",
-        "contentHash": "7lLwyrf+2cTuPju0swTWtRNYesnOMxXhGugMnGGNEPDB4g/+BCUsub2RDYAxnBnbnND7QmPwZnneLrTIQOdAbg=="
       }
     }
   }

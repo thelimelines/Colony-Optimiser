@@ -630,7 +630,7 @@
                                 <DataGrid ItemsSource="{Binding JobResults}">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Job" Binding="{Binding JobDisplayName}" Width="*" />
-                                        <DataGridTextColumn Header="Workers" Binding="{Binding Workers}" Width="80" />
+                                        <DataGridTextColumn Header="Workers / machines" Binding="{Binding BlockCount}" Width="105" />
                                         <DataGridTextColumn Header="Tool" Binding="{Binding SelectedToolDisplayName}" Width="*" />
                                     </DataGrid.Columns>
                                 </DataGrid>

@@ -49,6 +49,9 @@ public sealed class MainWindowLayoutTests
         var viewModel = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindowViewModel.cs"));
 
         Assert.Contains("function enableNodeDrag", source, StringComparison.Ordinal);
+        Assert.Contains("function layoutSankey", source, StringComparison.Ordinal);
+        Assert.Contains("nodesPerColumn", source, StringComparison.Ordinal);
+        Assert.Contains("requiredHeight", source, StringComparison.Ordinal);
         Assert.Contains("elk.bundled.js", source, StringComparison.Ordinal);
         Assert.Contains("new ELK()", source, StringComparison.Ordinal);
         Assert.Contains("'elk.algorithm': 'layered'", source, StringComparison.Ordinal);
@@ -66,6 +69,9 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("LayerSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("NodeLayoutDirection", xaml, StringComparison.Ordinal);
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
+        Assert.Contains("CropFarmLayouts", viewModel, StringComparison.Ordinal);
+        Assert.Contains("TrapRows.ToList().ForEach(row => row.Count = 0)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("result.IsOptimal", viewModel, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -78,7 +84,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("WriteVisualisationSmokeResult(succeeded)", source, StringComparison.Ordinal);
         Assert.Contains("MainTabs.SelectedIndex = 6", source, StringComparison.Ordinal);
         Assert.Contains("Environment.SpecialFolder.LocalApplicationData", source, StringComparison.Ordinal);
-        Assert.Contains("MicrosoftEdgeWebView2RuntimeInstallerX64.exe", source, StringComparison.Ordinal);
+        Assert.Contains("MicrosoftEdgeWebview2Setup.exe", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -121,10 +127,12 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("-win-x64.msi", readme, StringComparison.Ordinal);
         Assert.Contains("ColonyOptimizer.Installer.wixproj", script, StringComparison.Ordinal);
         Assert.Contains("ColonyOptimizer.Setup.wixproj", script, StringComparison.Ordinal);
-        Assert.Contains("Get-WebView2RuntimeInstaller", script, StringComparison.Ordinal);
-        Assert.Contains("MicrosoftEdgeWebView2RuntimeInstallerX64.exe", script, StringComparison.Ordinal);
-        Assert.Contains("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
-        Assert.Contains("DetectCondition=\"WebView2RuntimeMachineVersion OR WebView2RuntimeUserVersion\"", bundle, StringComparison.Ordinal);
+        Assert.Contains("Get-WebView2Bootstrapper", script, StringComparison.Ordinal);
+        Assert.Contains("MicrosoftEdgeWebview2Setup.exe", script, StringComparison.Ordinal);
+        Assert.Contains("LinkId=2124703", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("LinkId=2124701", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ExePackage", bundle, StringComparison.Ordinal);
+        Assert.DoesNotContain("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
     }
 

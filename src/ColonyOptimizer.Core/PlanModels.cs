@@ -93,9 +93,9 @@ public sealed class OptimizationSettings
 
 public sealed class ForestryLayout
 {
-    public int ForesterCount { get; set; } = 1;
-    public int PlotWidth { get; set; } = 3;
-    public int PlotLength { get; set; } = 33;
+    public int ForesterCount { get; set; }
+    public int PlotWidth { get; set; }
+    public int PlotLength { get; set; }
 
     public static int GetTreeSlotCount(int width, int length) =>
         Math.Max(0, width / 3) * Math.Max(0, length / 3);
@@ -103,8 +103,8 @@ public sealed class ForestryLayout
 
 public sealed class CropFarmLayout
 {
-    public int Width { get; set; } = 1;
-    public int Length { get; set; } = 1;
+    public int Width { get; set; }
+    public int Length { get; set; }
 }
 
 public sealed class TimingOverride

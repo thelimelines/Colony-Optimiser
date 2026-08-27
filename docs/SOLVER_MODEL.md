@@ -10,7 +10,7 @@ The optimiser builds its feasible recipe set before constructing constraints:
 - forbidden recipes and recipes needing locked science are excluded;
 - forcing a recipe excludes other recipes that produce the same output;
 - if no forced recipe for a forced output remains eligible, the optimiser produces an error;
-- an automated queue remains available when an eligible worker recipe produces all the same outputs. Its crafts are deprioritised as fallbacks unless the queue recipe is preferred or forced; and
+- an automated queue remains available when every one of its outputs is available from the eligible worker-recipe set. Its crafts are deprioritised as fallbacks unless the queue recipe is preferred or forced; and
 - preferred recipes remain feasible alternatives but receive a lower penalty in the preference objective.
 
 Automatic external-source detection examines parsed non-player producers before these eligibility filters. An input is automatic external material only when it has no parsed non-player producer at all. A science-gated, forbidden, or displaced producer therefore does not silently turn its output into an external source; the optimiser reports why the requested item cannot currently be produced.
@@ -45,7 +45,7 @@ For every job type `j`:
 
 ```text
 sum_(r assigned to j) C_r * effectiveWorkload(r)
-    <= N_j * availableWorkerMilliseconds
+    <= N_j * availableBlockMilliseconds
 ```
 
 Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle and are counted as machine blocks rather than workers. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Dedicated farm or forestry crafts also reserve their required workers explicitly.
@@ -56,17 +56,17 @@ Simple crop farms are modelled as dedicated farm areas. Their growable stages ad
 
 CP-SAT accepts integer coefficients, so item quantities are multiplied by `1,000,000` and rounded to the nearest integer using midpoint rounding away from zero. This retains quantities down to one millionth of an item; each converted coefficient or demand can differ from its decimal value by at most half a millionth. The same conversion is used for material-balance coefficients and the raw-resource objective.
 
-Work is represented in whole milliseconds. Each recipe's cooldown or explicit workload is divided by its effective tool multiplier, converted to milliseconds, rounded up, and clamped to at least one millisecond. Available worker time is converted to milliseconds after efficiency and headroom are applied, then rounded down. Rounding workload up and capacity down avoids granting work that does not fit within the represented time.
+Work is represented in whole milliseconds. Each recipe's cooldown or explicit workload is divided by its effective tool multiplier, converted to milliseconds, rounded up, and clamped to at least one millisecond. Available job-block time is converted to milliseconds after efficiency and headroom are applied, then rounded down. Rounding workload up and capacity down avoids granting work that does not fit within the represented time.
 
-Craft and worker counts remain integers and are not rounded after solving. Displayed decimal totals are reconstructed from those solved counts and the original decimal item quantities, while effective cooldown and workload displays use the integer millisecond values enforced by the solver.
+Craft and job-block counts remain integers and are not rounded after solving. Displayed decimal totals are reconstructed from those solved counts and the original decimal item quantities, while effective cooldown and workload displays use the integer millisecond values enforced by the solver.
 
 ## Objectives
 
-The default lexicographic objective is:
+The default `FewestWorkers` lexicographic objective is:
 
-1. minimise crafts from automated queues that have an ordinary worker-recipe alternative;
-2. minimise worker blocks, then automated machine blocks;
-3. minimise non-preferred craft count while retaining those block minima; and
+1. minimise worker blocks, then automated machine blocks;
+2. minimise crafts from automated queues whose outputs are collectively covered by eligible worker recipes;
+3. minimise non-preferred craft count while retaining those block and fallback minima; and
 4. minimise total worker or machine milliseconds.
 
 Preferred-recipes-first first minimises non-preferred crafts, then automated fallbacks, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption first minimises inputs with no enabled producer, then automated fallbacks, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.

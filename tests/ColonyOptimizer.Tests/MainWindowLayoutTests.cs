@@ -135,6 +135,8 @@ public sealed class MainWindowLayoutTests
         Assert.DoesNotContain("<ExePackage", bundle, StringComparison.Ordinal);
         Assert.DoesNotContain("WebView2RuntimeInstallerPath", bundle, StringComparison.Ordinal);
         Assert.Contains("artifacts\\*", workflow, StringComparison.Ordinal);
+        Assert.Contains("git merge-base --is-ancestor", workflow, StringComparison.Ordinal);
+        Assert.Contains("origin/main", workflow, StringComparison.Ordinal);
     }
 
     private static string FindWorkspaceDirectory()

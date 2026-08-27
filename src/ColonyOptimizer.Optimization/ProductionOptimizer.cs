@@ -386,14 +386,14 @@ public sealed class ProductionOptimizer
         }
     }
 
-    private static void AddWorkloadConstraints(CpModel model, IReadOnlyCollection<RecipeDefinition> recipes, IReadOnlyDictionary<string, IntVar> craftVariables, IReadOnlyDictionary<string, IntVar> workerVariables, IReadOnlyDictionary<string, JobCapacity> capacities)
+    private static void AddWorkloadConstraints(CpModel model, IReadOnlyCollection<RecipeDefinition> recipes, IReadOnlyDictionary<string, IntVar> craftVariables, IReadOnlyDictionary<string, IntVar> jobBlockVariables, IReadOnlyDictionary<string, JobCapacity> capacities)
     {
         foreach (var group in recipes.GroupBy(recipe => recipe.JobTypeId, StringComparer.OrdinalIgnoreCase))
         {
             var capacity = capacities[group.Key];
             var crafts = group.Select(recipe => craftVariables[recipe.Id]).ToArray();
             var milliseconds = group.Select(recipe => EffectiveWorkloadMilliseconds(recipe, capacity)).ToArray();
-            model.Add(CreateExpression(model, crafts, milliseconds) <= workerVariables[group.Key] * capacity.AvailableMillisecondsPerWorker);
+            model.Add(CreateExpression(model, crafts, milliseconds) <= jobBlockVariables[group.Key] * capacity.AvailableMillisecondsPerBlock);
 
             var dedicatedCrafts = capacity.IsAutomatedQueue
                 ? []
@@ -403,7 +403,7 @@ public sealed class ProductionOptimizer
                 model.Add(CreateExpression(
                     model,
                     dedicatedCrafts.Select(recipe => craftVariables[recipe.Id]),
-                    dedicatedCrafts.Select(recipe => (long)recipe.DedicatedWorkersPerCraft)) <= workerVariables[group.Key]);
+                    dedicatedCrafts.Select(recipe => (long)recipe.DedicatedWorkersPerCraft)) <= jobBlockVariables[group.Key]);
             }
         }
     }
@@ -440,7 +440,7 @@ public sealed class ProductionOptimizer
             ? new[] { preferences, automatedFallbacks, totalWorkers, totalMachineBlocks, workload }
             : objective == OptimizationObjective.LowestRawResourceConsumption
                 ? new[] { rawConsumption, automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload }
-                : new[] { automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload };
+                : new[] { totalWorkers, totalMachineBlocks, automatedFallbacks, preferences, workload };
 
         CpSolverStatus status = CpSolverStatus.Unknown;
         foreach (var metric in order)
@@ -465,7 +465,7 @@ public sealed class ProductionOptimizer
         return status;
     }
 
-    private static void PopulateResult(GameDatabase database, ProductionPlan plan, GameTiming timing, StochasticOutputPolicy stochasticOutputPolicy, IReadOnlyDictionary<string, DemandBreakdown> demand, IReadOnlySet<string> externalItems, IReadOnlyCollection<RecipeDefinition> recipes, IReadOnlyDictionary<string, IntVar> craftVariables, IReadOnlyDictionary<string, IntVar> workerVariables, IReadOnlyDictionary<string, JobCapacity> capacities, CpSolver solver, OptimizationResult result)
+    private static void PopulateResult(GameDatabase database, ProductionPlan plan, GameTiming timing, StochasticOutputPolicy stochasticOutputPolicy, IReadOnlyDictionary<string, DemandBreakdown> demand, IReadOnlySet<string> externalItems, IReadOnlyCollection<RecipeDefinition> recipes, IReadOnlyDictionary<string, IntVar> craftVariables, IReadOnlyDictionary<string, IntVar> jobBlockVariables, IReadOnlyDictionary<string, JobCapacity> capacities, CpSolver solver, OptimizationResult result)
     {
         var netFlows = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         foreach (var recipe in recipes)
@@ -538,10 +538,10 @@ public sealed class ProductionOptimizer
             }
         }
 
-        foreach (var job in workerVariables)
+        foreach (var job in jobBlockVariables)
         {
-            var workers = solver.Value(job.Value);
-            if (workers <= 0)
+            var blockCount = solver.Value(job.Value);
+            if (blockCount <= 0)
             {
                 continue;
             }
@@ -552,12 +552,12 @@ public sealed class ProductionOptimizer
             {
                 JobTypeId = job.Key,
                 JobDisplayName = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(job.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
-                Workers = capacity.IsAutomatedQueue ? 0 : workers,
-                MachineBlocks = capacity.IsAutomatedQueue ? workers : 0,
+                Workers = capacity.IsAutomatedQueue ? 0 : blockCount,
+                MachineBlocks = capacity.IsAutomatedQueue ? blockCount : 0,
                 IsAutomatedQueue = capacity.IsAutomatedQueue,
                 WorkloadSeconds = workloadSeconds,
-                CapacitySeconds = workers * capacity.AvailableMillisecondsPerWorker / (decimal)MillisecondsPerSecond,
-                UtilisationPercent = workers == 0 || capacity.AvailableMillisecondsPerWorker == 0 ? 0m : workloadSeconds / (workers * capacity.AvailableMillisecondsPerWorker / (decimal)MillisecondsPerSecond) * 100m,
+                CapacitySeconds = blockCount * capacity.AvailableMillisecondsPerBlock / (decimal)MillisecondsPerSecond,
+                UtilisationPercent = blockCount == 0 || capacity.AvailableMillisecondsPerBlock == 0 ? 0m : workloadSeconds / (blockCount * capacity.AvailableMillisecondsPerBlock / (decimal)MillisecondsPerSecond) * 100m,
                 SelectedToolId = capacity.SelectedToolId,
                 SelectedToolDisplayName = capacity.SelectedToolId is null
                     ? null
@@ -577,7 +577,7 @@ public sealed class ProductionOptimizer
                     JobDisplayName = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(job.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
                     ToolId = toolId,
                     ToolDisplayName = tool?.DisplayName ?? DisplayName.FromIdentifier(toolId),
-                    Quantity = workers,
+                    Quantity = blockCount,
                     CraftingSpeed = tool?.CraftingSpeed ?? 1m,
                     Durability = tool?.Durability ?? 0m,
                     ReplacementPerCycle = replacementPerCycle,
@@ -659,7 +659,7 @@ public sealed class ProductionOptimizer
     private static string Sanitize(string value) => string.Concat(value.Select(character => char.IsLetterOrDigit(character) ? character : '_'));
 
     private sealed record RecipeEligibility(IReadOnlyCollection<RecipeDefinition> Recipes, IReadOnlyCollection<OptimizationMessage> Messages);
-    private sealed record JobCapacity(long AvailableMillisecondsPerWorker, string? SelectedToolId, decimal ToolMultiplier, decimal ToolDurabilitySeconds, bool ToolRequiresStockpileItem, bool IsAutomatedQueue)
+    private sealed record JobCapacity(long AvailableMillisecondsPerBlock, string? SelectedToolId, decimal ToolMultiplier, decimal ToolDurabilitySeconds, bool ToolRequiresStockpileItem, bool IsAutomatedQueue)
     {
         public bool IsConsumableTool => ToolRequiresStockpileItem && !string.IsNullOrWhiteSpace(SelectedToolId) && ToolDurabilitySeconds > 0m;
     }

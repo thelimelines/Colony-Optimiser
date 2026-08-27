@@ -71,7 +71,7 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void prefers_a_worker_recipe_when_an_automated_queue_can_produce_the_same_output()
+    public void fewest_workers_uses_an_automated_queue_when_it_avoids_a_worker_block()
     {
         var database = CreateDatabase(activeSeconds: 100m);
         database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
@@ -79,6 +79,25 @@ public sealed class ProductionOptimizerTests
         database.Recipes.Add(Recipe("machine-widget", "machine", 1m, "widget"));
 
         var result = new ProductionOptimizer().Optimize(database, Plan(("widget", 1m)), new OptimizationSettings());
+
+        Assert.True(result.IsFeasible);
+        Assert.Equal(0, result.TotalWorkers);
+        Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
+        Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
+    }
+
+    [Fact]
+    public void preferred_recipes_first_uses_a_worker_recipe_when_an_automated_queue_is_only_a_fallback()
+    {
+        var database = CreateDatabase(activeSeconds: 100m);
+        database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
+        database.Recipes.Add(Recipe("worker-widget", "worker", 100m, "widget"));
+        database.Recipes.Add(Recipe("machine-widget", "machine", 1m, "widget"));
+
+        var result = new ProductionOptimizer().Optimize(
+            database,
+            Plan(("widget", 1m)),
+            new OptimizationSettings { Objective = OptimizationObjective.PreferredRecipesFirst });
 
         Assert.True(result.IsFeasible);
         Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
@@ -218,11 +237,26 @@ public sealed class ProductionOptimizerTests
             Id = "crop",
             DisplayName = "Crop",
             JobTypeId = "worker",
-            DefaultFieldTiles = 49,
+            DefaultFieldTiles = 7,
             GrowthCyclesPerHarvest = 1m
         };
         crop.Outputs.Add(new ItemAmount("produce", 1m));
         database.CropFarmSources.Add(crop);
+        database.ForestrySources.Add(new ForestrySourceDefinition
+        {
+            Id = "forest",
+            DisplayName = "Forest",
+            JobTypeId = "worker",
+            LogItemId = "logs",
+            LeavesItemId = "leaves",
+            TreesPerForesterPerCycle = 100,
+            LogsPerTree = 1,
+            LeavesPerTree = 0,
+            WorkSecondsPerForesterCycle = 1m,
+            DefaultForesterCount = 1,
+            DefaultPlotWidth = 3,
+            DefaultPlotLength = 15
+        });
         const string oldPlan = """
             {
               "FormatVersion": 1,
@@ -242,14 +276,17 @@ public sealed class ProductionOptimizerTests
         Assert.Equal("Old plan", document.Plan.Name);
         Assert.Empty(document.Plan.CropFarmLayouts);
         var forestry = Assert.Single(document.Plan.ForestryLayouts).Value;
-        Assert.Equal(3, forestry.PlotWidth);
-        Assert.Equal(33, forestry.PlotLength);
+        Assert.Equal(0, forestry.ForesterCount);
+        Assert.Equal(0, forestry.PlotWidth);
+        Assert.Equal(0, forestry.PlotLength);
 
-        document.Plan.Targets.Add(new DemandTarget { ItemId = "produce", Amount = 49m, Unit = DemandUnit.PerCycle });
+        document.Plan.Targets.Add(new DemandTarget { ItemId = "produce", Amount = 7m, Unit = DemandUnit.PerCycle });
+        document.Plan.Targets.Add(new DemandTarget { ItemId = "logs", Amount = 5m, Unit = DemandUnit.PerCycle });
         var result = new ProductionOptimizer().Optimize(database, document.Plan, new OptimizationSettings());
 
         Assert.True(result.IsFeasible);
-        Assert.Equal(49m, result.TotalOutputs.Single(output => output.ItemId == "produce").PerCycle);
+        Assert.Equal(7m, result.TotalOutputs.Single(output => output.ItemId == "produce").PerCycle);
+        Assert.Equal(5m, result.TotalOutputs.Single(output => output.ItemId == "logs").PerCycle);
 
         using var resaved = JsonDocument.Parse(JsonSerializer.Serialize(new SavedPlanDocument
         {

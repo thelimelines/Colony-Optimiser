@@ -36,7 +36,7 @@ In the folder containing the download, right-click and choose **Open in Terminal
 Get-FileHash .\ColonyOptimizer-<version>-Setup.exe -Algorithm SHA256
 ```
 
-Compare the displayed hash with the matching `.sha256` file from the same release. They must be identical. Substitute the MSI or ZIP filename if you chose that asset.
+Compare the displayed hash value with the value in the matching `.sha256` file from the same release. The values must match. Substitute the MSI or ZIP filename if you chose that asset.
 
 ## First use
 

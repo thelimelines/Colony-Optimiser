@@ -159,6 +159,7 @@ public sealed class JobTypeDefinition
     public string? ToolsetId { get; set; }
     public decimal? ActiveSecondsPerCycle { get; set; }
     public bool IsAutomatedQueue { get; set; }
+    public bool IsSingleBlock { get; set; }
 }
 
 public sealed class ToolDefinition

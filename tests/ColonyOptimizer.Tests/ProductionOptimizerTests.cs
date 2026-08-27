@@ -74,7 +74,7 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void fewest_workers_uses_an_automated_queue_when_it_avoids_a_worker_block()
+    public void avoids_an_automated_fallback_when_a_worker_recipe_can_meet_demand()
     {
         var database = CreateDatabase(activeSeconds: 100m);
         database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
@@ -84,9 +84,9 @@ public sealed class ProductionOptimizerTests
         var result = new ProductionOptimizer().Optimize(database, Plan(("widget", 1m)), new OptimizationSettings());
 
         Assert.True(result.IsFeasible);
-        Assert.Equal(0, result.TotalWorkers);
-        Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
-        Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
+        Assert.Equal(1, result.TotalWorkers);
+        Assert.Contains(result.RecipeAllocations, allocation => allocation.RecipeId == "worker-widget");
+        Assert.DoesNotContain(result.RecipeAllocations, allocation => allocation.RecipeId == "machine-widget");
     }
 
     [Fact]
@@ -163,10 +163,10 @@ public sealed class ProductionOptimizerTests
     }
 
     [Theory]
-    [InlineData(72, 1)]
-    [InlineData(73, 2)]
-    [InlineData(720, 10)]
-    public void limits_automated_machine_throughput_by_full_cycle_capacity(decimal demand, long expectedMachines)
+    [InlineData(72, true)]
+    [InlineData(73, false)]
+    [InlineData(720, false)]
+    public void limits_an_automated_queue_to_its_single_machine_block(decimal demand, bool isFeasible)
     {
         var database = CreateDatabase(activeSeconds: 100m);
         database.Jobs.Add(new JobTypeDefinition { Id = "machine", DisplayName = "Machine", IsAutomatedQueue = true });
@@ -174,14 +174,19 @@ public sealed class ProductionOptimizerTests
 
         var result = new ProductionOptimizer().Optimize(database, Plan(("widget", demand)), new OptimizationSettings());
 
-        Assert.True(result.IsFeasible);
+        Assert.Equal(isFeasible, result.IsFeasible);
+        if (!isFeasible)
+        {
+            return;
+        }
+
         Assert.True(result.IsOptimal);
         Assert.Equal(0, result.TotalWorkers);
-        Assert.Equal(expectedMachines, result.TotalMachineBlocks);
+        Assert.Equal(1, result.TotalMachineBlocks);
         var machine = Assert.Single(result.JobRequirements);
         Assert.True(machine.IsAutomatedQueue);
         Assert.Equal(0, machine.Workers);
-        Assert.Equal(expectedMachines, machine.MachineBlocks);
+        Assert.Equal(1, machine.MachineBlocks);
     }
 
     [Fact]
@@ -736,7 +741,7 @@ public sealed class ProductionOptimizerTests
 
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.tailor" && job.ToolsetId == "default");
         Assert.Contains(database.Jobs, job => job.Id == "pipliz.cook" && job.ToolsetId == "default");
-        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue && job.ToolsetId is null);
+        Assert.Contains(database.Jobs, job => job.Id == "pipliz.odditypress" && job.IsAutomatedQueue && job.IsSingleBlock && job.ToolsetId is null);
     }
 
     [Fact]

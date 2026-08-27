@@ -6,7 +6,11 @@
     html, body { height: 100%; margin: 0; overflow: hidden; background: #102025; color: #edf6f5; font: 13px "Segoe UI", sans-serif; }
     svg { width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
     svg:active { cursor: grabbing; }
-    .link { fill: none; stroke-opacity: .5; mix-blend-mode: screen; }
+    .link { fill: none; stroke-opacity: .38; }
+    .link:hover { stroke-opacity: .92; }
+    .sankey-label { fill: #f4faf9; font-size: 13px; font-weight: 600; pointer-events: none; paint-order: stroke; stroke: #102025; stroke-width: 3px; stroke-linejoin: round; }
+    .sankey-label-detail { fill: #c8dfdc; font-size: 11px; pointer-events: none; paint-order: stroke; stroke: #102025; stroke-width: 3px; stroke-linejoin: round; }
+    .sankey-label-leader { stroke: #78aeb0; stroke-width: 1; stroke-opacity: .7; pointer-events: none; }
     .edge { fill: none; stroke: #78aeb0; stroke-width: 1.6; opacity: .86; stroke-linejoin: round; stroke-linecap: round; }
     .edge-label { fill: #e7f1f0; font-size: 11px; pointer-events: none; paint-order: stroke; stroke: #102025; stroke-width: 3px; stroke-linejoin: round; }
     .node rect { stroke-width: 1; }
@@ -36,6 +40,7 @@
     };
     let graphState = { hasData: false, mode: 0, nodes: 0, links: 0, panEnabled: true, wheelZoomEnabled: true };
     let renderPromise = Promise.resolve();
+    let renderGeneration = 0;
 
     function showTooltip(node) {
       const jobBlock = node.jobBlock
@@ -131,8 +136,58 @@
         .nodePadding(22)
         .nodeAlign(d3.sankeyJustify)
         .extent([[26, 58], [width - 26, height - 58]])
-        .iterations(48);
+        .iterations(24);
       return { sankey, graph: sankey(graphData) };
+    }
+
+    function layoutSankeyLabels(nodes, width, height) {
+      const minimumGap = 32, top = 42, bottom = Math.max(top, height - 42);
+      const columns = new Map();
+      nodes.forEach(node => {
+        const side = node.x0 < width / 2 ? 'right' : 'left';
+        const key = `${side}:${Math.round(node.x0)}`;
+        if (!columns.has(key)) columns.set(key, []);
+        columns.get(key).push(node);
+      });
+      columns.forEach(column => {
+        const side = column[0].x0 < width / 2 ? 'right' : 'left';
+        const ordered = column.sort((left, right) => (left.y0 + left.y1) - (right.y0 + right.y1));
+        let nextY = top;
+        ordered.forEach(node => {
+          node.labelPreferredY = (node.y0 + node.y1) / 2 - 6;
+          node.labelY = Math.max(node.labelPreferredY, nextY);
+          nextY = node.labelY + minimumGap;
+        });
+        if (ordered[ordered.length - 1].labelY > bottom) {
+          nextY = bottom;
+          for (let index = ordered.length - 1; index >= 0; index--) {
+            ordered[index].labelY = nextY;
+            nextY -= minimumGap;
+          }
+        }
+        ordered.forEach(node => {
+          node.labelSide = side;
+          node.labelX = side === 'right' ? node.x1 + 7 : node.x0 - 7;
+          node.labelAnchor = side === 'right' ? 'start' : 'end';
+          node.labelMoved = Math.abs(node.labelY - node.labelPreferredY) > 2;
+        });
+      });
+    }
+
+    function updateSankeyLabels(graph, labels, width, height) {
+      layoutSankeyLabels(graph.nodes, width, height);
+      labels.select('.sankey-label-leader')
+        .attr('x1', node => node.labelSide === 'right' ? node.x1 : node.x0)
+        .attr('y1', node => (node.y0 + node.y1) / 2)
+        .attr('x2', node => node.labelSide === 'right' ? node.labelX - 3 : node.labelX + 3)
+        .attr('y2', node => node.labelY - 5)
+        .attr('visibility', node => node.labelMoved ? 'visible' : 'hidden');
+      labels.select('.sankey-label')
+        .attr('x', node => node.labelX).attr('y', node => node.labelY)
+        .attr('text-anchor', node => node.labelAnchor);
+      labels.select('.sankey-label-detail')
+        .attr('x', node => node.labelX).attr('y', node => node.labelY + 15)
+        .attr('text-anchor', node => node.labelAnchor);
     }
 
     function renderSankey(data, width, availableHeight) {
@@ -163,19 +218,21 @@
       const nodes = viewport.append('g').selectAll('g').data(graph.nodes).enter().append('g').attr('class', 'node')
         .attr('transform', node => `translate(${node.x0},${node.y0})`)
         .on('mouseenter', showTooltip).on('mousemove', moveTooltip).on('mouseleave', hideTooltip);
+      const labels = viewport.append('g').selectAll('g').data(graph.nodes).enter().append('g').attr('class', 'sankey-node-label');
       enableNodeDrag(nodes, (node, x, y) => {
           const nodeHeight = node.y1 - node.y0;
           node.y0 = Math.max(40, Math.min(height - 40 - nodeHeight, y));
           node.y1 = node.y0 + nodeHeight;
           sankey.update(graph);
           redrawSankey(graph, sankey, viewport);
+          updateSankeyLabels(graph, labels, width, height);
       });
       nodes.append('rect').attr('height', node => Math.max(1, node.y1 - node.y0)).attr('width', node => node.x1 - node.x0)
         .attr('fill', node => node.kind === 'Recipe' ? '#7bb985' : '#5f8f9d').attr('stroke', '#d6f0ed');
-      nodes.append('text').attr('x', node => node.x0 < width / 2 ? 22 : -8).attr('y', 14)
-        .attr('text-anchor', node => node.x0 < width / 2 ? 'start' : 'end').text(node => node.label);
-      nodes.append('text').attr('class', 'kind').attr('x', node => node.x0 < width / 2 ? 22 : -8).attr('y', 30)
-        .attr('text-anchor', node => node.x0 < width / 2 ? 'start' : 'end').text(node => node.jobBlock || node.kind);
+      labels.append('line').attr('class', 'sankey-label-leader');
+      labels.append('text').attr('class', 'sankey-label').text(node => node.label);
+      labels.append('text').attr('class', 'sankey-label-detail').text(node => node.jobBlock || node.kind);
+      updateSankeyLabels(graph, labels, width, height);
     }
 
     function collapseItemNodes(data) {
@@ -298,7 +355,7 @@
       return points[points.length - 1];
     }
 
-    async function renderNodeVisualiser(data) {
+    async function renderNodeVisualiser(data, generation) {
       const collapsedGraph = collapseItemNodes(data);
       const nodes = collapsedGraph.nodes;
       const byId = new Map(nodes.map(node => [node.id, node]));
@@ -323,12 +380,16 @@
         children: nodes.map(node => ({ id: node.id, width: nodeWidth, height: nodeHeight })),
         edges: links.map(link => ({ id: link.id, sources: [link.source], targets: [link.target] }))
       });
+      if (generation !== renderGeneration) return null;
       const laidOutNodes = new Map((layout.children || []).map(node => [node.id, node]));
       nodes.forEach(node => {
         const position = laidOutNodes.get(node.id);
         node.x = (position ? position.x : 0) + nodeWidth / 2;
         node.y = (position ? position.y : 0) + nodeHeight / 2;
       });
+      viewport.selectAll('*').remove();
+      tooltip.style('display', 'none');
+      d3.select('#empty').style('display', 'none');
       const edgeLayer = viewport.append('g');
       const labelLayer = viewport.append('g');
       const nodeLayer = viewport.append('g');
@@ -358,25 +419,44 @@
       return { originalNodeCount: data.nodes.length, collapsedItemNodes: data.nodes.length - nodes.length };
     }
 
-    async function renderGraph(data) {
-      viewport.selectAll('*').remove();
-      tooltip.style('display', 'none');
+    function setGraphState(hasData, mode) {
+      graphState = { hasData, mode, nodes: 0, links: 0, panEnabled: true, wheelZoomEnabled: true, layoutEngine: mode === 1 ? 'elk-layered' : 'sankey-circular' };
+    }
+
+    async function renderGraph(data, generation) {
       const hasData = data && data.nodes && data.nodes.length && data.links && data.links.length;
       const mode = data && data.mode === 1 ? 1 : 0;
-      d3.select('#empty').style('display', hasData ? 'none' : 'grid');
-      graphState = { hasData: !!hasData, mode, nodes: 0, links: 0, panEnabled: true, wheelZoomEnabled: true, layoutEngine: mode === 1 ? 'elk-layered' : 'sankey-circular' };
-      if (!hasData) return;
+      if (!hasData) {
+        if (generation !== renderGeneration) return;
+        viewport.selectAll('*').remove();
+        tooltip.style('display', 'none');
+        d3.select('#empty').style('display', 'grid');
+        setGraphState(false, mode);
+        return;
+      }
       const width = Math.max(1000, svg.node().getBoundingClientRect().width || 1000);
       if (data.mode === 0) {
         const contentHeight = Math.max(640, svg.node().getBoundingClientRect().height || 640);
-        renderSankey(data, width, contentHeight);
+        const collapsedGraph = collapseItemNodes(data);
+        if (generation !== renderGeneration) return;
+        viewport.selectAll('*').remove();
+        tooltip.style('display', 'none');
+        d3.select('#empty').style('display', 'none');
+        setGraphState(true, mode);
+        renderSankey(collapsedGraph, width, contentHeight);
       }
-      else Object.assign(graphState, await renderNodeVisualiser(data));
+      else {
+        const renderResult = await renderNodeVisualiser(data, generation);
+        if (renderResult === null || generation !== renderGeneration) return;
+        setGraphState(true, mode);
+        Object.assign(graphState, renderResult);
+      }
       graphState.nodes = viewport.selectAll('.node').size();
       graphState.links = viewport.selectAll('.visual-link').size();
     }
     window.setGraph = function(data) {
-      renderPromise = renderGraph(data);
+      const generation = ++renderGeneration;
+      renderPromise = renderGraph(data, generation);
       return renderPromise;
     };
     window.waitForGraph = () => renderPromise;

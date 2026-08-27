@@ -831,7 +831,8 @@ public sealed class GameDataLoader
                 DisplayName = DisplayName.FromIdentifier(recipeGroup.Key),
                 JobBlockId = block?.BlockTypeId,
                 ToolsetId = block?.ToolsetId,
-                IsAutomatedQueue = block?.IsAutomatedQueue ?? false
+                IsAutomatedQueue = block?.IsAutomatedQueue ?? false,
+                IsSingleBlock = block?.IsAutomatedQueue ?? false
             });
         }
     }

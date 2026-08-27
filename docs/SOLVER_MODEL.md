@@ -10,7 +10,7 @@ The optimiser builds its feasible recipe set before constructing constraints:
 - forbidden recipes and recipes needing locked science are excluded;
 - forcing a recipe excludes other recipes that produce the same output;
 - if no forced recipe for a forced output remains eligible, the optimiser produces an error;
-- an automated queue remains available when every one of its outputs is available from the eligible worker-recipe set. Its crafts are deprioritised as fallbacks unless the queue recipe is preferred or forced; and
+- an automated queue remains available when every one of its outputs is available from the eligible worker-recipe set. Its crafts are used only when no eligible worker allocation can satisfy the plan, unless the queue recipe is preferred or forced; and
 - preferred recipes remain feasible alternatives but receive a lower penalty in the preference objective.
 
 Automatic external-source detection examines parsed non-player producers before these eligibility filters. An input is automatic external material only when it has no parsed non-player producer at all. A science-gated, forbidden, or displaced producer therefore does not silently turn its output into an external source; the optimiser reports why the requested item cannot currently be produced.
@@ -48,7 +48,7 @@ sum_(r assigned to j) C_r * effectiveWorkload(r)
     <= N_j * availableBlockMilliseconds
 ```
 
-Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle and are counted as machine blocks rather than workers. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Mining recipes are instead grouped by mined output resource, so each resource reports its own miner requirement. Dedicated farm or forestry crafts also reserve their required workers explicitly.
+Worker-operated jobs use their configured active time, or the general worker-active interval, multiplied by efficiency and reduced by requested headroom. Automated queues use the full game cycle, are counted as machine blocks rather than workers, and are limited to their single queue block. This is a shared-capacity constraint: crafts from several recipes consume the same job capacity before the worker or machine-block count is chosen. Mining recipes are instead grouped by mined output resource, so each resource reports its own miner requirement. Dedicated farm or forestry crafts also reserve their required workers explicitly.
 
 Simple crop farms are modelled as dedicated farm areas. Their growable stages advance once per night, so an `n`-stage crop has a growth period of `n - 1` full game cycles. Each configured field produces its harvested-tile count divided by that period; one farmer is reserved for the area. The crop source tab records field tile counts, growth, science, and expected output per game cycle.
 
@@ -64,14 +64,15 @@ Craft and job-block counts remain integers and are not rounded after solving. Di
 
 ## Objectives
 
-The default `FewestWorkers` lexicographic objective is:
+All objectives first minimise crafts from automated queues whose outputs are collectively covered by eligible worker recipes. This keeps automated queues as fallbacks unless they are explicitly preferred or forced, or no worker allocation can meet the plan.
 
-1. minimise worker blocks, then automated machine blocks;
-2. minimise crafts from automated queues whose outputs are collectively covered by eligible worker recipes;
-3. minimise non-preferred craft count while retaining those block and fallback minima; and
-4. minimise total worker or machine milliseconds.
+The default `FewestWorkers` lexicographic objective then:
 
-Preferred-recipes-first first minimises non-preferred crafts, then automated fallbacks, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption first minimises inputs with no enabled producer, then automated fallbacks, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
+1. minimises worker blocks, then automated machine blocks;
+2. minimises non-preferred craft count while retaining the fallback and block minima; and
+3. minimises total worker or machine milliseconds.
+
+Preferred-recipes-first then minimises non-preferred crafts, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption then minimises inputs with no enabled producer, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
 
 ## External materials
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ColonyOptimizer.Core;
@@ -30,6 +31,13 @@ public partial class MainWindowViewModel : ObservableObject
     private string? _currentPlanPath;
     private HashSet<string> _plannerItemIds = new(StringComparer.OrdinalIgnoreCase);
     private bool _lastPlanRestored;
+    private readonly DispatcherTimer _visualisationRefreshDebounceTimer;
+
+    public MainWindowViewModel()
+    {
+        _visualisationRefreshDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+        _visualisationRefreshDebounceTimer.Tick += OnVisualisationRefreshDebounceTimerTick;
+    }
 
     public ObservableCollection<ItemOption> FilteredItems { get; } = [];
     public ObservableCollection<DemandRow> Targets { get; } = [];
@@ -198,7 +206,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         SaveVisualisationSettings();
-        RefreshVisualisation();
+        DebounceVisualisationRefresh();
     }
     partial void OnLayerSpacingChanged(int value)
     {
@@ -209,7 +217,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         SaveVisualisationSettings();
-        RefreshVisualisation();
+        DebounceVisualisationRefresh();
     }
     partial void OnUseTimingOverrideChanged(bool value) => RefreshTimingPresentation();
     partial void OnGameTimeScaleChanged(decimal value) => RefreshTimingPresentation();
@@ -1145,6 +1153,18 @@ public partial class MainWindowViewModel : ObservableObject
     private static string GetMaterialRecipeSignature(RecipeDefinition recipe) => string.Join('|',
         recipe.Outputs.OrderBy(amount => amount.ItemId, StringComparer.OrdinalIgnoreCase).Select(amount => $"out:{amount.ItemId}:{amount.Amount}:{amount.Chance}:{amount.IsOptional}")
             .Concat(recipe.Inputs.OrderBy(amount => amount.ItemId, StringComparer.OrdinalIgnoreCase).Select(amount => $"in:{amount.ItemId}:{amount.Amount}:{amount.Chance}:{amount.IsOptional}")));
+
+    private void DebounceVisualisationRefresh()
+    {
+        _visualisationRefreshDebounceTimer.Stop();
+        _visualisationRefreshDebounceTimer.Start();
+    }
+
+    private void OnVisualisationRefreshDebounceTimerTick(object? sender, EventArgs eventArgs)
+    {
+        _visualisationRefreshDebounceTimer.Stop();
+        RefreshVisualisation();
+    }
 
     private void RefreshVisualisation()
     {

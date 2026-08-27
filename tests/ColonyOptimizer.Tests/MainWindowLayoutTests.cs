@@ -52,6 +52,12 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("function layoutSankey", source, StringComparison.Ordinal);
         Assert.Contains("nodesPerColumn", source, StringComparison.Ordinal);
         Assert.Contains("requiredHeight", source, StringComparison.Ordinal);
+        Assert.Contains(".iterations(24)", source, StringComparison.Ordinal);
+        Assert.Contains("let renderGeneration = 0", source, StringComparison.Ordinal);
+        Assert.Contains("generation !== renderGeneration", source, StringComparison.Ordinal);
+        Assert.Contains("renderSankey(collapsedGraph", source, StringComparison.Ordinal);
+        Assert.Contains("function layoutSankeyLabels", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("mix-blend-mode: screen", source, StringComparison.Ordinal);
         Assert.Contains("elk.bundled.js", source, StringComparison.Ordinal);
         Assert.Contains("new ELK()", source, StringComparison.Ordinal);
         Assert.Contains("'elk.algorithm': 'layered'", source, StringComparison.Ordinal);
@@ -68,6 +74,8 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("NodeSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("LayerSpacing", xaml, StringComparison.Ordinal);
         Assert.Contains("NodeLayoutDirection", xaml, StringComparison.Ordinal);
+        Assert.Contains("DebounceVisualisationRefresh", viewModel, StringComparison.Ordinal);
+        Assert.Contains("DispatcherTimer", viewModel, StringComparison.Ordinal);
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
         Assert.Contains("CropFarmLayouts", viewModel, StringComparison.Ordinal);
         Assert.Contains("TrapRows.ToList().ForEach(row => row.Count = 0)", viewModel, StringComparison.Ordinal);

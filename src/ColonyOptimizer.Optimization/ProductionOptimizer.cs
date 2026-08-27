@@ -44,7 +44,7 @@ public sealed class ProductionOptimizer
         // need a capacity variable, but only the former contributes to worker count.
         var jobBlockVariables = jobCapacities.ToDictionary(
             entry => entry.Key,
-            entry => model.NewIntVar(0, settings.MaxWorkersPerJob, $"job_blocks_{Sanitize(entry.Key)}"),
+            entry => model.NewIntVar(0, entry.Value.IsSingleBlock ? 1 : settings.MaxWorkersPerJob, $"job_blocks_{Sanitize(entry.Key)}"),
             StringComparer.OrdinalIgnoreCase);
 
         AddSelectedToolsWithoutProducers(availableRecipes, jobCapacities, externalItems);
@@ -419,9 +419,14 @@ public sealed class ProductionOptimizer
     private static JobCapacity ResolveJobCapacity(GameDatabase database, ProductionPlan plan, OptimizationSettings settings, GameTiming timing, string jobTypeId)
     {
         var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(jobTypeId, StringComparison.OrdinalIgnoreCase));
+        var isAutomatedQueue = job?.IsAutomatedQueue ?? false;
+        // The game's autocrafter is a single shared queue.  Keep the flag
+        // explicit on the domain model so other single-block jobs can be
+        // represented without treating them as automated queues.
+        var isSingleBlock = isAutomatedQueue || job?.IsSingleBlock == true;
         // Queued machines run for the whole game cycle; worker-active time applies
         // only to colonists operating a job block.
-        var activeSeconds = job?.IsAutomatedQueue == true
+        var activeSeconds = isAutomatedQueue
             ? timing.CycleSeconds
             : job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
         var availableMilliseconds = (long)Math.Floor(activeSeconds * MillisecondsPerSecond * Math.Clamp(settings.EfficiencyPercent, 0m, 100m) / 100m * (100m - Math.Clamp(settings.HeadroomPercent, 0m, 50m)) / 100m);
@@ -439,16 +444,17 @@ public sealed class ProductionOptimizer
             multiplier,
             selectedTool?.Durability ?? 0m,
             selectedTool?.RequiresStockpileItem ?? false,
-            job?.IsAutomatedQueue ?? false);
+            isAutomatedQueue,
+            isSingleBlock);
     }
 
     private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric automatedFallbacks, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
     {
         var order = objective == OptimizationObjective.PreferredRecipesFirst
-            ? new[] { preferences, automatedFallbacks, totalWorkers, totalMachineBlocks, workload }
+            ? new[] { automatedFallbacks, preferences, totalWorkers, totalMachineBlocks, workload }
             : objective == OptimizationObjective.LowestRawResourceConsumption
-                ? new[] { rawConsumption, automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload }
-                : new[] { totalWorkers, totalMachineBlocks, automatedFallbacks, preferences, workload };
+                ? new[] { automatedFallbacks, rawConsumption, totalWorkers, totalMachineBlocks, preferences, workload }
+                : new[] { automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload };
 
         CpSolverStatus status = CpSolverStatus.Unknown;
         foreach (var metric in order)
@@ -667,7 +673,7 @@ public sealed class ProductionOptimizer
     private static string Sanitize(string value) => string.Concat(value.Select(character => char.IsLetterOrDigit(character) ? character : '_'));
 
     private sealed record RecipeEligibility(IReadOnlyCollection<RecipeDefinition> Recipes, IReadOnlyCollection<OptimizationMessage> Messages);
-    private sealed record JobCapacity(long AvailableMillisecondsPerBlock, string? SelectedToolId, decimal ToolMultiplier, decimal ToolDurabilitySeconds, bool ToolRequiresStockpileItem, bool IsAutomatedQueue)
+    private sealed record JobCapacity(long AvailableMillisecondsPerBlock, string? SelectedToolId, decimal ToolMultiplier, decimal ToolDurabilitySeconds, bool ToolRequiresStockpileItem, bool IsAutomatedQueue, bool IsSingleBlock)
     {
         public bool IsConsumableTool => ToolRequiresStockpileItem && !string.IsNullOrWhiteSpace(SelectedToolId) && ToolDurabilitySeconds > 0m;
     }

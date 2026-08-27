@@ -173,9 +173,9 @@ public sealed class ProductionOptimizer
         foreach (var source in database.CropFarmSources)
         {
             var savedLayout = plan.CropFarmLayouts.GetValueOrDefault(source.Id);
-            var fieldTiles = savedLayout is not null
-                ? Math.Max(1, savedLayout.Width) * Math.Max(1, savedLayout.Length)
-                : Math.Max(1, plan.CropFarmTileCounts.GetValueOrDefault(source.Id, source.DefaultFieldTiles));
+            var fieldTiles = savedLayout is { Width: > 0, Length: > 0 }
+                ? savedLayout.Width * savedLayout.Length
+                : Math.Max(1, source.DefaultFieldTiles);
             if (source.GrowthCyclesPerHarvest <= 0m || source.Outputs.Count == 0)
             {
                 continue;
@@ -203,17 +203,17 @@ public sealed class ProductionOptimizer
     {
         foreach (var source in database.ForestrySources)
         {
-            var layout = plan.ForestryLayouts.GetValueOrDefault(source.Id) ?? new ForestryLayout
-            {
-                ForesterCount = source.DefaultForesterCount,
-                PlotWidth = source.DefaultPlotWidth,
-                PlotLength = source.DefaultPlotLength
-            };
-            var foresters = Math.Max(1, layout.ForesterCount);
-            var legacyTreeCount = Math.Max(0, layout.TreesPerForester);
-            var totalTrees = legacyTreeCount > 0
-                ? legacyTreeCount
-                : ForestryLayout.GetTreeSlotCount(layout.PlotWidth, layout.PlotLength);
+            var layout = plan.ForestryLayouts.GetValueOrDefault(source.Id);
+            var foresters = layout is { ForesterCount: > 0 }
+                ? layout.ForesterCount
+                : Math.Max(1, source.DefaultForesterCount);
+            var plotWidth = layout is { PlotWidth: > 0 }
+                ? layout.PlotWidth
+                : Math.Max(1, source.DefaultPlotWidth);
+            var plotLength = layout is { PlotLength: > 0 }
+                ? layout.PlotLength
+                : Math.Max(1, source.DefaultPlotLength);
+            var totalTrees = ForestryLayout.GetTreeSlotCount(plotWidth, plotLength);
             var harvestCapacity = foresters * source.TreesPerForesterPerCycle;
             var harvestedTrees = Math.Min(totalTrees, harvestCapacity);
             var workersRequired = Math.Max(1, (int)Math.Ceiling(harvestedTrees / (decimal)source.TreesPerForesterPerCycle));

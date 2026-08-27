@@ -179,16 +179,19 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
-    public void preserves_crop_field_dimensions_through_plan_json_round_trip()
+    public void persists_current_crop_and_forestry_dimensions_through_plan_json_round_trip()
     {
         var document = new SavedPlanDocument
         {
             Plan = new ProductionPlan
             {
-                CropFarmTileCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["crop"] = 49 },
                 CropFarmLayouts = new Dictionary<string, CropFarmLayout>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["crop"] = new CropFarmLayout { Width = 7, Length = 7 }
+                },
+                ForestryLayouts = new Dictionary<string, ForestryLayout>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["forest"] = new ForestryLayout { ForesterCount = 2, PlotWidth = 6, PlotLength = 15 }
                 }
             }
         };
@@ -196,14 +199,18 @@ public sealed class ProductionOptimizerTests
         var restored = JsonSerializer.Deserialize<SavedPlanDocument>(JsonSerializer.Serialize(document));
 
         Assert.NotNull(restored);
+        Assert.Equal(SavedPlanDocument.CurrentFormatVersion, restored.FormatVersion);
         var layout = Assert.Single(restored.Plan.CropFarmLayouts).Value;
         Assert.Equal(7, layout.Width);
         Assert.Equal(7, layout.Length);
-        Assert.Equal(49, restored.Plan.CropFarmTileCounts["crop"]);
+        var forestry = Assert.Single(restored.Plan.ForestryLayouts).Value;
+        Assert.Equal(2, forestry.ForesterCount);
+        Assert.Equal(6, forestry.PlotWidth);
+        Assert.Equal(15, forestry.PlotLength);
     }
 
     [Fact]
-    public void uses_saved_crop_dimensions_in_preference_to_legacy_tile_count()
+    public void loads_obsolete_plan_fields_tolerantly_and_resaves_only_the_current_schema()
     {
         var database = CreateDatabase(activeSeconds: 720m);
         var crop = new CropFarmSourceDefinition
@@ -211,18 +218,49 @@ public sealed class ProductionOptimizerTests
             Id = "crop",
             DisplayName = "Crop",
             JobTypeId = "worker",
+            DefaultFieldTiles = 49,
             GrowthCyclesPerHarvest = 1m
         };
         crop.Outputs.Add(new ItemAmount("produce", 1m));
         database.CropFarmSources.Add(crop);
-        var plan = Plan(("produce", 49m));
-        plan.CropFarmTileCounts["crop"] = 1;
-        plan.CropFarmLayouts["crop"] = new CropFarmLayout { Width = 7, Length = 7 };
+        const string oldPlan = """
+            {
+              "FormatVersion": 1,
+              "Plan": {
+                "Name": "Old plan",
+                "CropFarmTileCounts": { "crop": 49 },
+                "ForestryLayouts": { "forest": { "TreesPerForester": 9 } },
+                "FuturePlanField": true
+              },
+              "FutureDocumentField": "ignored"
+            }
+            """;
+        var document = JsonSerializer.Deserialize<SavedPlanDocument>(oldPlan);
 
-        var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
+        Assert.NotNull(document);
+        Assert.Equal(1, document.FormatVersion);
+        Assert.Equal("Old plan", document.Plan.Name);
+        Assert.Empty(document.Plan.CropFarmLayouts);
+        var forestry = Assert.Single(document.Plan.ForestryLayouts).Value;
+        Assert.Equal(3, forestry.PlotWidth);
+        Assert.Equal(33, forestry.PlotLength);
+
+        document.Plan.Targets.Add(new DemandTarget { ItemId = "produce", Amount = 49m, Unit = DemandUnit.PerCycle });
+        var result = new ProductionOptimizer().Optimize(database, document.Plan, new OptimizationSettings());
 
         Assert.True(result.IsFeasible);
         Assert.Equal(49m, result.TotalOutputs.Single(output => output.ItemId == "produce").PerCycle);
+
+        using var resaved = JsonDocument.Parse(JsonSerializer.Serialize(new SavedPlanDocument
+        {
+            Plan = document.Plan,
+            Settings = document.Settings,
+            DataSource = document.DataSource
+        }));
+        Assert.Equal(SavedPlanDocument.CurrentFormatVersion, resaved.RootElement.GetProperty("FormatVersion").GetInt32());
+        var savedPlan = resaved.RootElement.GetProperty("Plan");
+        Assert.False(savedPlan.TryGetProperty("CropFarmTileCounts", out _));
+        Assert.False(savedPlan.GetProperty("ForestryLayouts").GetProperty("forest").TryGetProperty("TreesPerForester", out _));
     }
 
     [Fact]
@@ -510,7 +548,7 @@ public sealed class ProductionOptimizerTests
         var database = new GameDataLoader().Load(FindVanillaGameDataPath());
         var plan = Plan(("wheat", 100m));
         plan.UnlockedSciences.Add("pipliz.farming");
-        plan.CropFarmTileCounts["pipliz.wheatfarm"] = 200;
+        plan.CropFarmLayouts["pipliz.wheatfarm"] = new CropFarmLayout { Width = 1, Length = 200 };
 
         var result = new ProductionOptimizer().Optimize(database, plan, new OptimizationSettings());
 

@@ -60,7 +60,7 @@ Colony Optimiser loads recipes and timing dynamically rather than embedding one 
 ## Privacy and safety
 
 - The app works locally and has no telemetry or sign-in.
-- Network access occurs only when you select **Download latest public data**; this downloads public Colony Survival data and commit information from GitHub. The app does not check for updates automatically.
+- Network access can occur when you select **Download latest public data**, which downloads public Colony Survival data and commit information from GitHub, or when visualisation initialisation fails and the bundled Microsoft WebView2 bootstrapper attempts to install or repair its runtime. The app does not check for updates automatically.
 - Game saves are opened read-only. Do not attach save files to bug reports unless requested directly.
 - Settings, cached public game data, and logs are kept under your Windows local app-data folder. Delete the `ColonyOptimizer` folder there to reset the app.
 - Download updates only from this repository's Releases page. Verifying the SHA-256 checksum is recommended, particularly for an unsigned release.

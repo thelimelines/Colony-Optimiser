@@ -33,4 +33,4 @@ The acquisition service checks common Steam locations, Steam library folders, an
 
 ## Persistence and diagnostics
 
-Plans are JSON with a `.colonyplan` extension. Settings and downloaded data locations are distinct from plans. Technical exceptions are written as bounded JSONL files under `%LOCALAPPDATA%\ColonyOptimizer\Logs`; no unrelated filesystem data is collected.
+Plans are JSON with a `.colonyplan` extension. Loading accepts older and unknown fields while saving writes the current plan schema. Settings and downloaded data locations are distinct from plans. Technical exceptions are written as bounded JSONL files under `%LOCALAPPDATA%\ColonyOptimizer\Logs`; no unrelated filesystem data is collected.

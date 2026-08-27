@@ -9,11 +9,11 @@ Creating a version tag publishes a GitHub release; it is not a dry run. Release 
 5. Create an annotated tag whose version exactly matches `Directory.Build.props`, then push it:
 
    ```powershell
-   git tag -a v1.0.1 -m "Colony Optimiser v1.0.1"
-   git push origin v1.0.1
+   git tag -a v<version> -m "Colony Optimiser v<version>"
+   git push origin v<version>
    ```
 
-6. GitHub Actions checks out the required public game data, runs the test suite, publishes a self-contained Windows x64 portable ZIP, a per-machine MSI, and a Setup EXE. Each carries Microsoft's small online WebView2 bootstrapper; the app uses it only if WebView2 is absent, then creates SHA-256 checksums and attaches them to the GitHub release.
+6. GitHub Actions checks out the required public game data, runs the test suite, publishes a self-contained Windows x64 portable ZIP, a per-machine MSI, and a Setup EXE. The app publish output includes Microsoft's small online WebView2 bootstrapper rather than the full standalone runtime; if visualisation initialisation fails, the app can use it to install or repair WebView2. The workflow then creates SHA-256 checksums and attaches them to the GitHub release.
 7. After the workflow succeeds, download the Setup EXE from the release page, verify its checksum using the instructions in `README.md`, and perform a clean installation and first-use check.
 
 Published version tags and their release artefacts are immutable. If a published package is defective, fix the problem and issue a new version; do not move the tag or replace files attached to the existing release. If the workflow fails before publishing a release, correct the problem, delete the unpublished local and remote tag if necessary, then create the tag again from the corrected commit.
@@ -25,7 +25,7 @@ The release workflow refuses malformed versions and packages into a new `artifac
 To create the same package locally without publishing it, restore the solution and both projects in `installer` as described in `CONTRIBUTING.md`, then run:
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 1.0.1
+.\scripts\Publish-Release.ps1 -Version <version>
 ```
 
 Use a clean workspace or remove the packages for that version before running the command. Inspect the ZIP, MSI, Setup EXE, and their checksum files under `artifacts`. Commit lock-file updates only when they result from an intentional dependency update.

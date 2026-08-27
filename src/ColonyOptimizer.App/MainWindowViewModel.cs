@@ -721,9 +721,6 @@ public partial class MainWindowViewModel : ObservableObject
         plan.RecipePolicies = RecipeRows
             .SelectMany(row => row.RelatedRecipeIds.Select(id => new KeyValuePair<string, RecipePolicy>(id, row.Policy)))
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        // Keep the legacy tile count in sync for backwards compatibility, but save
-        // the authoritative shape so reopening a plan cannot change its area.
-        plan.CropFarmTileCounts = CropSourceRows.ToDictionary(row => row.Id, row => Math.Max(1, row.FieldTiles), StringComparer.OrdinalIgnoreCase);
         plan.CropFarmLayouts = CropSourceRows.ToDictionary(row => row.Id, row => new CropFarmLayout
         {
             Width = Math.Max(1, row.FieldWidth),
@@ -883,18 +880,16 @@ public partial class MainWindowViewModel : ObservableObject
                 continue;
             }
 
-            // Legacy plan files only have a tile count. A one-by-N field retains
-            // that exact area instead of silently rounding it up to a ten-wide plot.
-            var tiles = Math.Max(1, plan.CropFarmTileCounts.GetValueOrDefault(cropSource.Id, cropSource.DefaultFieldTiles));
+            var tiles = Math.Max(1, cropSource.DefaultFieldTiles);
             cropSource.FieldWidth = 1;
             cropSource.FieldLength = tiles;
         }
         foreach (var forestrySource in ForestrySourceRows)
         {
             var layout = plan.ForestryLayouts.GetValueOrDefault(forestrySource.Id);
-            forestrySource.ForesterCount = layout?.ForesterCount ?? forestrySource.DefaultForesterCount;
-            forestrySource.PlotWidth = layout?.TreesPerForester > 0 ? 3 : layout?.PlotWidth ?? forestrySource.DefaultPlotWidth;
-            forestrySource.PlotLength = layout?.TreesPerForester > 0 ? layout.TreesPerForester : layout?.PlotLength ?? forestrySource.DefaultPlotLength;
+            forestrySource.ForesterCount = layout is { ForesterCount: > 0 } ? layout.ForesterCount : forestrySource.DefaultForesterCount;
+            forestrySource.PlotWidth = layout is { PlotWidth: > 0 } ? layout.PlotWidth : forestrySource.DefaultPlotWidth;
+            forestrySource.PlotLength = layout is { PlotLength: > 0 } ? layout.PlotLength : forestrySource.DefaultPlotLength;
         }
         foreach (var recipe in RecipeRows)
         {

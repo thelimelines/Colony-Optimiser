@@ -176,6 +176,11 @@
             <Setter Property="HeadersVisibility" Value="Column" />
             <Setter Property="CanUserAddRows" Value="False" />
             <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="EnableRowVirtualization" Value="True" />
+            <Setter Property="EnableColumnVirtualization" Value="True" />
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
         </Style>
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#284247" />
@@ -315,7 +320,7 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <TextBlock Text="Plan" Foreground="#BDD4D5" Margin="0,0,8,0" VerticalAlignment="Center" />
                     <TextBox Width="220" Text="{Binding SelectedPlanName, UpdateSourceTrigger=PropertyChanged}" />
-                    <Button Content="New" Command="{Binding NewPlanCommand}" />
+                    <Button Content="New" ToolTip="Create a blank plan" Command="{Binding NewPlanCommand}" />
                     <Button Content="Open" Command="{Binding OpenPlanCommand}" />
                     <Button Content="Save" Command="{Binding SavePlanCommand}" />
                     <Button Content="Save as" Command="{Binding SavePlanAsCommand}" />
@@ -325,7 +330,7 @@
             </Grid>
         </Border>
         <Grid Grid.Row="1">
-            <TabControl x:Name="MainTabs" TabStripPlacement="Left" Background="#0D1518" BorderBrush="#405D62">
+            <TabControl x:Name="MainTabs" TabStripPlacement="Left" Background="#0D1518" BorderBrush="#405D62" SelectionChanged="MainTabs_SelectionChanged">
                 <TabItem Header="Planner">
                     <Grid Margin="18">
                         <Grid.RowDefinitions>
@@ -464,7 +469,7 @@
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <Image Source="{Binding IconPath}" Width="20" Height="20" Margin="0,0,7,0" />
+                                                    <Image Source="{Binding IconPath, Converter={StaticResource IconSourceConverter}}" Width="20" Height="20" Margin="0,0,7,0" />
                                                     <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </DataTemplate>
@@ -565,16 +570,7 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBox Width="440" HorizontalAlignment="Left" Text="{Binding RecipeSearch, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search alternate recipes" />
-                        <DataGrid Grid.Row="1" Margin="0,12,0,0" ItemsSource="{Binding RecipeRows}">
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsVisible}" Value="False">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGrid.RowStyle>
+                        <DataGrid Grid.Row="1" Margin="0,12,0,0" ItemsSource="{Binding RecipeRowsView}">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Produces" Width="*" CellTemplate="{StaticResource RecipeOutputTemplate}" />
                                 <DataGridTextColumn Header="Ingredients" Binding="{Binding Ingredients}" Width="2*" />
@@ -661,7 +657,7 @@
                         </Grid>
                     </Grid>
                 </TabItem>
-                <TabItem Header="Visualisation">
+                <TabItem x:Name="VisualisationTab" Header="Visualisation">
                     <Grid Margin="18">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />

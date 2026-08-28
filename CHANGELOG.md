@@ -4,6 +4,16 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 ## Unreleased
 
+### Fixed
+
+- Keep existing plan and export files intact when a save or export cannot be written, and show a clear recovery message.
+- Keep Steam library discovery and public game-data cache cleanup from preventing startup or obscuring a completed update.
+
+### Changed
+
+- Resolve downloaded public game data to one recorded upstream commit before fetching it.
+- **New plan** now creates a blank plan, resetting progression, capacity, defence, solver, and timing choices to their defaults.
+
 ## [1.0.6] - 2026-08-28
 
 ### Fixed

@@ -72,7 +72,7 @@ The default `FewestWorkers` lexicographic objective then:
 2. minimises non-preferred craft count while retaining the fallback and block minima; and
 3. minimises total worker or machine milliseconds.
 
-Preferred-recipes-first then minimises non-preferred crafts, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption then minimises inputs with no enabled producer, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
+Preferred-recipes-first then minimises non-preferred crafts, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption then minimises inputs with no parsed non-player producer, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
 
 ## External materials
 

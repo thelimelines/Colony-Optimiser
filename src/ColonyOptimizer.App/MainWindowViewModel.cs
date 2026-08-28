@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -32,30 +34,34 @@ public partial class MainWindowViewModel : ObservableObject
     private HashSet<string> _plannerItemIds = new(StringComparer.OrdinalIgnoreCase);
     private bool _lastPlanRestored;
     private bool _isLoadingVisualisationSettings;
+    private bool _isVisualisationActive;
     private readonly DispatcherTimer _visualisationRefreshDebounceTimer;
 
     public MainWindowViewModel()
     {
         _visualisationRefreshDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
         _visualisationRefreshDebounceTimer.Tick += OnVisualisationRefreshDebounceTimerTick;
+        RecipeRowsView = CollectionViewSource.GetDefaultView(RecipeRows);
+        RecipeRowsView.Filter = MatchesRecipeSearch;
     }
 
-    public ObservableCollection<ItemOption> FilteredItems { get; } = [];
-    public ObservableCollection<DemandRow> Targets { get; } = [];
-    public ObservableCollection<ExternalItemRow> ExternalItems { get; } = [];
-    public ObservableCollection<SelectableEntry> ScienceRows { get; } = [];
-    public ObservableCollection<SelectableEntry> ToolRows { get; } = [];
-    public ObservableCollection<CropSourceRow> CropSourceRows { get; } = [];
-    public ObservableCollection<ForestrySourceRow> ForestrySourceRows { get; } = [];
-    public ObservableCollection<object> AreaJobRows { get; } = [];
-    public ObservableCollection<RecipeRow> RecipeRows { get; } = [];
-    public ObservableCollection<GuardRow> GuardRows { get; } = [];
-    public ObservableCollection<TrapRow> TrapRows { get; } = [];
-    public ObservableCollection<JobRequirement> JobResults { get; } = [];
-    public ObservableCollection<RecipeAllocation> AllocationResults { get; } = [];
-    public ObservableCollection<ToolRequirement> ToolResults { get; } = [];
-    public ObservableCollection<ExternalRequirement> ExternalResults { get; } = [];
-    public ObservableCollection<ProductionOutput> OutputResults { get; } = [];
+    public BulkObservableCollection<ItemOption> FilteredItems { get; } = [];
+    public BulkObservableCollection<DemandRow> Targets { get; } = [];
+    public BulkObservableCollection<ExternalItemRow> ExternalItems { get; } = [];
+    public BulkObservableCollection<SelectableEntry> ScienceRows { get; } = [];
+    public BulkObservableCollection<SelectableEntry> ToolRows { get; } = [];
+    public BulkObservableCollection<CropSourceRow> CropSourceRows { get; } = [];
+    public BulkObservableCollection<ForestrySourceRow> ForestrySourceRows { get; } = [];
+    public BulkObservableCollection<object> AreaJobRows { get; } = [];
+    public BulkObservableCollection<RecipeRow> RecipeRows { get; } = [];
+    public ICollectionView RecipeRowsView { get; }
+    public BulkObservableCollection<GuardRow> GuardRows { get; } = [];
+    public BulkObservableCollection<TrapRow> TrapRows { get; } = [];
+    public BulkObservableCollection<JobRequirement> JobResults { get; } = [];
+    public BulkObservableCollection<RecipeAllocation> AllocationResults { get; } = [];
+    public BulkObservableCollection<ToolRequirement> ToolResults { get; } = [];
+    public BulkObservableCollection<ExternalRequirement> ExternalResults { get; } = [];
+    public BulkObservableCollection<ProductionOutput> OutputResults { get; } = [];
     public ObservableCollection<string> RecentPlans { get; } = [];
     public ObservableCollection<WorldSaveOption> WorldSaveOptions { get; } = [];
 
@@ -127,12 +133,12 @@ public partial class MainWindowViewModel : ObservableObject
     public bool HasCoreIconAssets => _database is not null
         && new[] { "coppertools", "wheat", "alkanet" }.All(id =>
         {
-            var path = _database.Items.FirstOrDefault(item => item.Id.Equals(id, StringComparison.OrdinalIgnoreCase))?.IconPath;
+            var path = _database.FindItem(id)?.IconPath;
             return !string.IsNullOrWhiteSpace(path) && File.Exists(path);
         })
         && _database.Traps.All(trap =>
         {
-            var ammunitionIcon = _database.Items.FirstOrDefault(item => item.Id.Equals(trap.AmmunitionItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
+            var ammunitionIcon = _database.FindItem(trap.AmmunitionItemId)?.IconPath;
             return !string.IsNullOrWhiteSpace(trap.IconPath)
                 && File.Exists(trap.IconPath)
                 && !string.IsNullOrWhiteSpace(ammunitionIcon)
@@ -168,7 +174,15 @@ public partial class MainWindowViewModel : ObservableObject
         var path = _userSettings.LastGameDataDirectory;
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
         {
-            path = _acquisition.FindInstalledGameDataDirectories().FirstOrDefault();
+            try
+            {
+                path = _acquisition.FindInstalledGameDataDirectories().FirstOrDefault();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                FileLogger.Write(exception, "discover-installed-game-data-at-startup");
+                StatusText = "Game data was not found automatically. Choose a folder in Settings to continue.";
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(path))
@@ -201,6 +215,20 @@ public partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsNodeVisualiserSelected));
         RefreshVisualisation();
+    }
+
+    public void SetVisualisationActive(bool isActive)
+    {
+        if (_isVisualisationActive == isActive)
+        {
+            return;
+        }
+
+        _isVisualisationActive = isActive;
+        if (isActive)
+        {
+            RefreshVisualisation();
+        }
     }
     partial void OnNodeLayoutDirectionChanged(NodeLayoutDirection value)
     {
@@ -465,7 +493,7 @@ public partial class MainWindowViewModel : ObservableObject
             return false;
         }
 
-        var wroughtIron = _database.Items.FirstOrDefault(item => item.Id.Equals("ironwrought", StringComparison.OrdinalIgnoreCase));
+        var wroughtIron = _database.FindItem("ironwrought");
         if (wroughtIron is null)
         {
             return false;
@@ -560,12 +588,31 @@ public partial class MainWindowViewModel : ObservableObject
     {
         Targets.Clear();
         ExternalItems.Clear();
+        foreach (var science in ScienceRows) science.IsSelected = false;
+        foreach (var tool in ToolRows) tool.IsSelected = false;
         GuardRows.ToList().ForEach(row => row.Count = 0);
         TrapRows.ToList().ForEach(row => row.Count = 0);
         RecipeRows.ToList().ForEach(row => row.Policy = RecipePolicy.Allowed);
+        foreach (var cropSource in CropSourceRows)
+        {
+            cropSource.FieldWidth = 10;
+            cropSource.FieldLength = Math.Max(1, (int)Math.Ceiling(cropSource.DefaultFieldTiles / 10m));
+        }
+        foreach (var forestrySource in ForestrySourceRows)
+        {
+            forestrySource.ForesterCount = forestrySource.DefaultForesterCount;
+            forestrySource.PlotWidth = forestrySource.DefaultPlotWidth;
+            forestrySource.PlotLength = forestrySource.DefaultPlotLength;
+        }
+        EfficiencyPercent = 100m;
+        HeadroomPercent = 0m;
+        SelectedObjective = OptimizationObjective.FewestWorkers;
+        SelectedStochasticPolicy = StochasticOutputPolicy.ExpectedValue;
+        LoadTimingEditor(_database?.Timing ?? GameTiming.Default);
         SelectedPlanName = "Untitled plan";
         _currentPlanPath = null;
         ClearResults();
+        StatusText = "New blank plan";
     }
 
     [RelayCommand]
@@ -604,8 +651,7 @@ public partial class MainWindowViewModel : ObservableObject
             content.AppendLine(string.Join(',', Csv(tool.JobDisplayName), Csv(tool.ToolDisplayName), tool.Quantity, tool.CraftingSpeed.ToString(CultureInfo.InvariantCulture), tool.Durability.ToString(CultureInfo.InvariantCulture)));
         }
 
-        await File.WriteAllTextAsync(dialog.FileName, content.ToString());
-        StatusText = "CSV export created";
+        await WriteExportAsync(dialog.FileName, content.ToString(), "CSV");
     }
 
     [RelayCommand]
@@ -618,12 +664,12 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         var result = new { Jobs = JobResults, Recipes = AllocationResults, Outputs = OutputResults, Flows = _lastResult?.ProductionFlows, Tools = ToolResults, ExternalRequirements = ExternalResults, Headline = ResultHeadline, Detail = ResultDetail };
-        await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(result, JsonDefaults.Options));
-        StatusText = "JSON export created";
+        await WriteExportAsync(dialog.FileName, JsonSerializer.Serialize(result, JsonDefaults.Options), "JSON");
     }
 
     private void ApplyDatabase(GameDatabase database)
     {
+        IconPathToImageConverter.ClearCache();
         _database = database;
         DataDirectory = database.Source.SourcePath;
         DataSourceDisplay = $"{database.Source.SourceType}: {database.Source.SourcePath}" +
@@ -634,34 +680,27 @@ public partial class MainWindowViewModel : ObservableObject
         _plannerItemIds = GetPlannerItemIds(database);
         RefreshItemFilter();
 
-        ScienceRows.Clear();
-        foreach (var science in database.Sciences.OrderBy(science => science.DisplayName))
-        {
-            ScienceRows.Add(new SelectableEntry(science.Id, science.DisplayName, true));
-        }
+        ScienceRows.ReplaceWith(database.Sciences
+            .OrderBy(science => science.DisplayName)
+            .Select(science => new SelectableEntry(science.Id, science.DisplayName, true)));
 
-        ToolRows.Clear();
-        foreach (var tool in database.Tools.OrderBy(tool => GetToolSortOrder(tool.Id)).ThenBy(tool => tool.DisplayName))
-        {
-            ToolRows.Add(new SelectableEntry(tool.Id, tool.DisplayName, true, database.Items.FirstOrDefault(item => item.Id.Equals(tool.Id, StringComparison.OrdinalIgnoreCase))?.IconPath, IsToolSectionStart(tool.Id)));
-        }
+        ToolRows.ReplaceWith(database.Tools
+            .OrderBy(tool => GetToolSortOrder(tool.Id))
+            .ThenBy(tool => tool.DisplayName)
+            .Select(tool => new SelectableEntry(tool.Id, tool.DisplayName, true, database.FindItem(tool.Id)?.IconPath, IsToolSectionStart(tool.Id))));
 
-        CropSourceRows.Clear();
-        AreaJobRows.Clear();
-        foreach (var source in database.CropFarmSources.OrderBy(source => source.DisplayName))
-        {
-            var row = new CropSourceRow(source, EffectiveTiming, database);
-            CropSourceRows.Add(row);
-            AreaJobRows.Add(row);
-        }
+        var cropRows = database.CropFarmSources
+            .OrderBy(source => source.DisplayName)
+            .Select(source => new CropSourceRow(source, EffectiveTiming, database))
+            .ToArray();
+        CropSourceRows.ReplaceWith(cropRows);
 
-        ForestrySourceRows.Clear();
-        foreach (var source in database.ForestrySources.OrderBy(source => source.DisplayName))
-        {
-            var row = new ForestrySourceRow(source, EffectiveTiming, database);
-            ForestrySourceRows.Add(row);
-            AreaJobRows.Add(row);
-        }
+        var forestryRows = database.ForestrySources
+            .OrderBy(source => source.DisplayName)
+            .Select(source => new ForestrySourceRow(source, EffectiveTiming, database))
+            .ToArray();
+        ForestrySourceRows.ReplaceWith(forestryRows);
+        AreaJobRows.ReplaceWith(cropRows.Cast<object>().Concat(forestryRows));
 
         var automatedJobs = database.Jobs.Where(job => job.IsAutomatedQueue).Select(job => job.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var productionRecipes = database.Recipes.Where(recipe => !recipe.JobTypeId.Equals("player", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -671,28 +710,25 @@ public partial class MainWindowViewModel : ObservableObject
             .Select(group => group.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        RecipeRows.Clear();
-        foreach (var group in productionRecipes
+        RecipeRows.ReplaceWith(productionRecipes
             .Where(recipe => recipe.Outputs.Any(output => alternateOutputIds.Contains(output.ItemId)))
             .GroupBy(GetMaterialRecipeSignature, StringComparer.OrdinalIgnoreCase)
             .OrderBy(group => group.First().Outputs[0].ItemId)
-            .ThenBy(group => group.First().DisplayName))
-        {
-            var representative = group.OrderBy(recipe => recipe.RequiredScience is null ? 0 : 1).ThenBy(recipe => recipe.Id).First();
-            RecipeRows.Add(new RecipeRow(representative, automatedJobs.Contains(representative.JobTypeId), database, group.Select(recipe => recipe.Id)));
-        }
+            .ThenBy(group => group.First().DisplayName)
+            .Select(group =>
+            {
+                var representative = group.OrderBy(recipe => recipe.RequiredScience is null ? 0 : 1).ThenBy(recipe => recipe.Id).First();
+                return new RecipeRow(representative, automatedJobs.Contains(representative.JobTypeId), database, group.Select(recipe => recipe.Id));
+            }));
 
-        GuardRows.Clear();
-        foreach (var guard in database.Guards.OrderBy(guard => GetGuardSortOrder(guard.Id)).ThenBy(guard => guard.Shift))
-        {
-            GuardRows.Add(new GuardRow(guard, EffectiveTiming, database));
-        }
+        GuardRows.ReplaceWith(database.Guards
+            .OrderBy(guard => GetGuardSortOrder(guard.Id))
+            .ThenBy(guard => guard.Shift)
+            .Select(guard => new GuardRow(guard, EffectiveTiming, database)));
 
-        TrapRows.Clear();
-        foreach (var trap in database.Traps.OrderBy(trap => trap.DisplayName))
-        {
-            TrapRows.Add(new TrapRow(trap, database));
-        }
+        TrapRows.ReplaceWith(database.Traps
+            .OrderBy(trap => trap.DisplayName)
+            .Select(trap => new TrapRow(trap, database)));
 
         ExternalItems.Clear();
         ClearResults();
@@ -707,11 +743,14 @@ public partial class MainWindowViewModel : ObservableObject
 
         var selectedId = SelectedItem?.Id;
         var query = ItemSearch.Trim();
-        FilteredItems.Clear();
-        foreach (var item in _database.Items.Where(item => _plannerItemIds.Contains(item.Id) && (string.IsNullOrWhiteSpace(query) || item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) || item.Id.Contains(query, StringComparison.OrdinalIgnoreCase))).OrderBy(item => item.DisplayName).Take(250))
-        {
-            FilteredItems.Add(new ItemOption(item.Id, item.DisplayName, item.IconPath));
-        }
+        FilteredItems.ReplaceWith(_database.Items
+            .Where(item => _plannerItemIds.Contains(item.Id)
+                && (string.IsNullOrWhiteSpace(query)
+                    || item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || item.Id.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(item => item.DisplayName)
+            .Take(250)
+            .Select(item => new ItemOption(item.Id, item.DisplayName, item.IconPath)));
 
         SelectedItem = !string.IsNullOrWhiteSpace(selectedId)
             ? FilteredItems.FirstOrDefault(item => item.Id.Equals(selectedId, StringComparison.OrdinalIgnoreCase))
@@ -720,11 +759,19 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void RefreshRecipeFilter()
     {
+        RecipeRowsView.Refresh();
+    }
+
+    private bool MatchesRecipeSearch(object candidate) => candidate is RecipeRow row
+        && MatchesRecipeSearch(row);
+
+    private bool MatchesRecipeSearch(RecipeRow row)
+    {
         var query = RecipeSearch.Trim();
-        foreach (var row in RecipeRows)
-        {
-            row.IsVisible = string.IsNullOrWhiteSpace(query) || row.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) || row.Id.Contains(query, StringComparison.OrdinalIgnoreCase) || row.JobTypeId.Contains(query, StringComparison.OrdinalIgnoreCase);
-        }
+        return string.IsNullOrWhiteSpace(query)
+            || row.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || row.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || row.JobTypeId.Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
     private ProductionPlan BuildPlan()
@@ -734,19 +781,24 @@ public partial class MainWindowViewModel : ObservableObject
         plan.UnlockedSciences = ScienceRows.Where(row => row.IsSelected).Select(row => row.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         plan.AvailableTools = ToolRows.Where(row => row.IsSelected).Select(row => row.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         plan.RecipePolicies = RecipeRows
+            .Where(row => row.Policy != RecipePolicy.Allowed)
             .SelectMany(row => row.RelatedRecipeIds.Select(id => new KeyValuePair<string, RecipePolicy>(id, row.Policy)))
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        plan.CropFarmLayouts = CropSourceRows.ToDictionary(row => row.Id, row => new CropFarmLayout
-        {
-            Width = Math.Max(1, row.FieldWidth),
-            Length = Math.Max(1, row.FieldLength)
-        }, StringComparer.OrdinalIgnoreCase);
-        plan.ForestryLayouts = ForestrySourceRows.ToDictionary(row => row.Id, row => new ForestryLayout
-        {
-            ForesterCount = Math.Max(1, row.ForesterCount),
-            PlotWidth = Math.Max(1, row.PlotWidth),
-            PlotLength = Math.Max(1, row.PlotLength)
-        }, StringComparer.OrdinalIgnoreCase);
+        plan.CropFarmLayouts = CropSourceRows
+            .Where(row => row.FieldWidth != 10 || row.FieldLength != Math.Max(1, (int)Math.Ceiling(row.DefaultFieldTiles / 10m)))
+            .ToDictionary(row => row.Id, row => new CropFarmLayout
+            {
+                Width = Math.Max(1, row.FieldWidth),
+                Length = Math.Max(1, row.FieldLength)
+            }, StringComparer.OrdinalIgnoreCase);
+        plan.ForestryLayouts = ForestrySourceRows
+            .Where(row => row.ForesterCount != row.DefaultForesterCount || row.PlotWidth != row.DefaultPlotWidth || row.PlotLength != row.DefaultPlotLength)
+            .ToDictionary(row => row.Id, row => new ForestryLayout
+            {
+                ForesterCount = Math.Max(1, row.ForesterCount),
+                PlotWidth = Math.Max(1, row.PlotWidth),
+                PlotLength = Math.Max(1, row.PlotLength)
+            }, StringComparer.OrdinalIgnoreCase);
         plan.ExternalItems = ExternalItems.Select(item => item.ItemId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         plan.Guards = GuardRows.Where(row => row.Count > 0).Select(row => new GuardAssignment { GuardTypeId = row.Id, Count = row.Count, AmmoMode = row.AmmoMode, UtilisationPercent = row.UtilisationPercent, CustomRoundsPerCycle = row.CustomRoundsPerCycle }).ToList();
         plan.Traps = TrapRows.Where(row => row.Count > 0).Select(row => new TrapAssignment { TrapTypeId = row.Id, Count = row.Count }).ToList();
@@ -764,29 +816,35 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ApplyResult(OptimizationResult result)
     {
-        JobResults.Clear();
-        AllocationResults.Clear();
-        ToolResults.Clear();
-        ExternalResults.Clear();
-        OutputResults.Clear();
-        foreach (var job in result.JobRequirements.OrderByDescending(job => job.BlockCount)) JobResults.Add(job);
-        foreach (var allocation in result.RecipeAllocations.OrderBy(allocation => allocation.JobTypeId).ThenBy(allocation => allocation.RecipeId))
+        JobResults.ReplaceWith(result.JobRequirements.OrderByDescending(job => job.BlockCount));
+        AllocationResults.ReplaceWith(result.RecipeAllocations
+            .OrderBy(allocation => allocation.JobTypeId)
+            .ThenBy(allocation => allocation.RecipeId)
+            .Select(allocation =>
+            {
+                allocation.IconPath = _database?.FindRecipe(allocation.RecipeId)?.Outputs
+                    .Select(output => _database.FindItem(output.ItemId)?.IconPath)
+                    .FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
+                return allocation;
+            }));
+        ToolResults.ReplaceWith(result.ToolRequirements.OrderBy(tool => tool.ToolDisplayName).ThenBy(tool => tool.JobDisplayName));
+        ExternalResults.ReplaceWith(result.ExternalRequirements
+            .OrderBy(requirement => requirement.ItemId)
+            .Select(requirement =>
+            {
+                requirement.IconPath = _database?.FindItem(requirement.ItemId)?.IconPath;
+                return requirement;
+            }));
+        OutputResults.ReplaceWith(result.TotalOutputs
+            .OrderBy(output => output.ItemDisplayName)
+            .Select(output =>
+            {
+                output.IconPath = _database?.FindItem(output.ItemId)?.IconPath;
+                return output;
+            }));
+        if (!_isVisualisationActive)
         {
-            allocation.IconPath = _database?.Recipes.FirstOrDefault(recipe => recipe.Id.Equals(allocation.RecipeId, StringComparison.OrdinalIgnoreCase))?.Outputs
-                .Select(output => _database.Items.FirstOrDefault(item => item.Id.Equals(output.ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath)
-                .FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
-            AllocationResults.Add(allocation);
-        }
-        foreach (var tool in result.ToolRequirements.OrderBy(tool => tool.ToolDisplayName).ThenBy(tool => tool.JobDisplayName)) ToolResults.Add(tool);
-        foreach (var requirement in result.ExternalRequirements.OrderBy(requirement => requirement.ItemId))
-        {
-            requirement.IconPath = _database?.Items.FirstOrDefault(item => item.Id.Equals(requirement.ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
-            ExternalResults.Add(requirement);
-        }
-        foreach (var output in result.TotalOutputs.OrderBy(output => output.ItemDisplayName))
-        {
-            output.IconPath = _database?.Items.FirstOrDefault(item => item.Id.Equals(output.ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
-            OutputResults.Add(output);
+            SankeyGraphJson = "{\"mode\":0,\"nodes\":[],\"links\":[]}";
         }
         _lastResult = result;
         RefreshVisualisation();
@@ -812,6 +870,7 @@ public partial class MainWindowViewModel : ObservableObject
         ExternalResults.Clear();
         OutputResults.Clear();
         _lastResult = null;
+        SankeyGraphJson = "{\"mode\":0,\"nodes\":[],\"links\":[]}";
         ResultHeadline = "No calculation yet";
         ResultDetail = "Add production targets, configure progression, then optimise.";
     }
@@ -821,7 +880,18 @@ public partial class MainWindowViewModel : ObservableObject
         var plan = BuildPlan();
         plan.Name = Path.GetFileNameWithoutExtension(path);
         var document = new SavedPlanDocument { Plan = plan, Settings = BuildSettings(), DataSource = _database?.Source };
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document, JsonDefaults.Options));
+        try
+        {
+            await AtomicTextFile.WriteAsync(path, JsonSerializer.Serialize(document, JsonDefaults.Options));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Write(exception, "save-plan");
+            StatusText = "Plan could not be saved";
+            ShowError("The plan could not be saved. Check that the folder is writable and the file is not open in another program.");
+            return;
+        }
+
         _currentPlanPath = path;
         SelectedPlanName = Path.GetFileNameWithoutExtension(path);
         _userSettings.LastPlanPath = path;
@@ -830,6 +900,21 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsStore.Save(_userSettings);
         RefreshRecentPlans();
         StatusText = "Plan saved";
+    }
+
+    private async Task WriteExportAsync(string path, string content, string format)
+    {
+        try
+        {
+            await AtomicTextFile.WriteAsync(path, content);
+            StatusText = $"{format} export created";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Write(exception, $"export-{format.ToLowerInvariant()}");
+            StatusText = $"{format} export could not be created";
+            ShowError($"The {format} export could not be saved. Check that the folder is writable and the file is not open in another program.");
+        }
     }
 
     private async Task OpenPlanFromAsync(string path)
@@ -868,18 +953,16 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ApplyPlan(ProductionPlan plan, OptimizationSettings settings)
     {
-        Targets.Clear();
-        ExternalItems.Clear();
-        foreach (var target in plan.Targets)
+        Targets.ReplaceWith(plan.Targets.Select(target =>
         {
-            var item = _database?.Items.FirstOrDefault(candidate => candidate.Id.Equals(target.ItemId, StringComparison.OrdinalIgnoreCase));
-            Targets.Add(new DemandRow(target.ItemId, item?.DisplayName ?? DisplayName.FromIdentifier(target.ItemId), target.Amount, target.Unit, item?.IconPath));
-        }
-        foreach (var itemId in plan.ExternalItems)
+            var item = _database?.FindItem(target.ItemId);
+            return new DemandRow(target.ItemId, item?.DisplayName ?? DisplayName.FromIdentifier(target.ItemId), target.Amount, target.Unit, item?.IconPath);
+        }));
+        ExternalItems.ReplaceWith(plan.ExternalItems.Select(itemId =>
         {
-            var item = _database?.Items.FirstOrDefault(candidate => candidate.Id.Equals(itemId, StringComparison.OrdinalIgnoreCase));
-            ExternalItems.Add(new ExternalItemRow(itemId, item?.DisplayName ?? DisplayName.FromIdentifier(itemId), item?.IconPath));
-        }
+            var item = _database?.FindItem(itemId);
+            return new ExternalItemRow(itemId, item?.DisplayName ?? DisplayName.FromIdentifier(itemId), item?.IconPath);
+        }));
         foreach (var science in ScienceRows) science.IsSelected = plan.UnlockedSciences.Contains(science.Id);
         foreach (var tool in ToolRows) tool.IsSelected = plan.AvailableTools.Contains(tool.Id);
         foreach (var cropSource in CropSourceRows)
@@ -1063,7 +1146,7 @@ public partial class MainWindowViewModel : ObservableObject
             }
             foreach (var tool in ToolRows)
             {
-                var definition = _database.Tools.FirstOrDefault(candidate => candidate.Id.Equals(tool.Id, StringComparison.OrdinalIgnoreCase));
+                var definition = _database.FindTool(tool.Id);
                 tool.IsSelected = definition?.RequiredScience is null || imported.UnlockedScienceIds.Contains(definition.RequiredScience);
             }
 
@@ -1178,6 +1261,11 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void RefreshVisualisation()
     {
+        if (!_isVisualisationActive)
+        {
+            return;
+        }
+
         if (_lastResult is null || !_lastResult.IsFeasible)
         {
             SankeyGraphJson = "{\"mode\":0,\"nodes\":[],\"links\":[]}";
@@ -1300,7 +1388,7 @@ public partial class CropSourceRow : ObservableObject
         DefaultFieldTiles = source.DefaultFieldTiles;
         FieldWidth = 10;
         FieldLength = Math.Max(1, (int)Math.Ceiling(source.DefaultFieldTiles / 10m));
-        IconPath = database.Items.FirstOrDefault(item => item.Id.Equals(source.Outputs[0].ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
+        IconPath = database.FindItem(source.Outputs[0].ItemId)?.IconPath;
         UpdateTiming(timing);
         FertilityRequirement = source.FertilityRequirement;
         RequiredScience = source.RequiredScience is null ? "None" : ColonyOptimizer.Core.DisplayName.FromIdentifier(source.RequiredScience);
@@ -1367,11 +1455,11 @@ public partial class ForestrySourceRow : ObservableObject
     {
         _source = source;
         _timing = timing;
-        _configuredActiveSecondsPerCycle = database.Jobs.FirstOrDefault(job => job.Id.Equals(source.JobTypeId, StringComparison.OrdinalIgnoreCase))?.ActiveSecondsPerCycle;
+        _configuredActiveSecondsPerCycle = database.FindJob(source.JobTypeId)?.ActiveSecondsPerCycle;
         Id = source.Id;
         DisplayName = source.DisplayName;
-        LogIconPath = database.Items.FirstOrDefault(item => item.Id.Equals(source.LogItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
-        LeavesIconPath = database.Items.FirstOrDefault(item => item.Id.Equals(source.LeavesItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
+        LogIconPath = database.FindItem(source.LogItemId)?.IconPath;
+        LeavesIconPath = database.FindItem(source.LeavesItemId)?.IconPath;
         DefaultForesterCount = source.DefaultForesterCount;
         DefaultPlotWidth = source.DefaultPlotWidth;
         DefaultPlotLength = source.DefaultPlotLength;
@@ -1489,7 +1577,7 @@ public partial class RecipeRow : ObservableObject
         RelatedRecipeIds = (relatedRecipeIds ?? [recipe.Id]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         Ingredients = string.Join(", ", recipe.Inputs.Select(amount => $"{amount.Amount:0.##} {DisplayItem(database, amount.ItemId)}"));
         OutputName = string.Join(", ", recipe.Outputs.Select(amount => $"{amount.Amount:0.##} {DisplayItem(database, amount.ItemId)}"));
-        OutputIconPath = recipe.Outputs.Select(output => database.Items.FirstOrDefault(item => item.Id.Equals(output.ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath).FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
+        OutputIconPath = recipe.Outputs.Select(output => database.FindItem(output.ItemId)?.IconPath).FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
     }
 
     public string Id { get; }
@@ -1505,9 +1593,8 @@ public partial class RecipeRow : ObservableObject
     public bool IsAutomatedQueue { get; }
     public string Mode => IsAutomatedQueue ? "Queued machine" : "Worker job";
     [ObservableProperty] private RecipePolicy policy = RecipePolicy.Allowed;
-    [ObservableProperty] private bool isVisible = true;
 
-    private static string DisplayItem(GameDatabase database, string itemId) => database.Items.FirstOrDefault(item => item.Id.Equals(itemId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(itemId);
+    private static string DisplayItem(GameDatabase database, string itemId) => database.FindItem(itemId)?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(itemId);
 }
 
 public partial class GuardRow : ObservableObject
@@ -1520,8 +1607,8 @@ public partial class GuardRow : ObservableObject
         Id = guard.Id;
         DisplayName = guard.DisplayName;
         GuardShift = guard.Shift;
-        Ammo = string.Join(", ", guard.Ammunition.Select(ammo => $"{ammo.Amount:0.##} {database.Items.FirstOrDefault(item => item.Id.Equals(ammo.ItemId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(ammo.ItemId)}"));
-        AmmoIconPath = guard.Ammunition.Select(ammo => database.Items.FirstOrDefault(item => item.Id.Equals(ammo.ItemId, StringComparison.OrdinalIgnoreCase))?.IconPath).FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
+        Ammo = string.Join(", ", guard.Ammunition.Select(ammo => $"{ammo.Amount:0.##} {database.FindItem(ammo.ItemId)?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(ammo.ItemId)}"));
+        AmmoIconPath = guard.Ammunition.Select(ammo => database.FindItem(ammo.ItemId)?.IconPath).FirstOrDefault(icon => !string.IsNullOrWhiteSpace(icon));
         CooldownSeconds = guard.CooldownShotSeconds;
     }
 
@@ -1568,8 +1655,8 @@ public partial class TrapRow : ObservableObject
         Id = trap.Id;
         DisplayName = trap.DisplayName;
         IconPath = trap.IconPath;
-        Ammunition = database.Items.FirstOrDefault(item => item.Id.Equals(trap.AmmunitionItemId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(trap.AmmunitionItemId);
-        AmmunitionIconPath = database.Items.FirstOrDefault(item => item.Id.Equals(trap.AmmunitionItemId, StringComparison.OrdinalIgnoreCase))?.IconPath;
+        Ammunition = database.FindItem(trap.AmmunitionItemId)?.DisplayName ?? ColonyOptimizer.Core.DisplayName.FromIdentifier(trap.AmmunitionItemId);
+        AmmunitionIconPath = database.FindItem(trap.AmmunitionItemId)?.IconPath;
         AmmunitionCapacity = trap.AmmunitionCapacity;
         ReloadSecondsPerAmmunition = trap.ReloadSecondsPerAmmunition;
     }

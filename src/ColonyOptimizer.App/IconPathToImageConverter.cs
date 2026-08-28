@@ -10,7 +10,10 @@ namespace ColonyOptimizer.App;
 
 public sealed class IconPathToImageConverter : IValueConverter
 {
+    private const int DecodePixelSize = 48;
     private static readonly ConcurrentDictionary<string, ImageSource> Cache = new(StringComparer.OrdinalIgnoreCase);
+
+    public static void ClearCache() => Cache.Clear();
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -53,6 +56,7 @@ public sealed class IconPathToImageConverter : IValueConverter
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = DecodePixelSize;
             image.UriSource = new Uri(Path.GetFullPath(localPath), UriKind.Absolute);
             image.EndInit();
             image.Freeze();

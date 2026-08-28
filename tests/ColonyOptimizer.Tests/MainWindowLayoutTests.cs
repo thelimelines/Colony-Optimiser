@@ -32,6 +32,9 @@ public sealed class MainWindowLayoutTests
         var xaml = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindow.xaml"));
 
         Assert.Contains("IconPathToImageConverter", xaml, StringComparison.Ordinal);
+        var iconConverter = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "IconPathToImageConverter.cs"));
+        Assert.Contains("DecodePixelWidth", iconConverter, StringComparison.Ordinal);
+        Assert.Contains("ClearCache", iconConverter, StringComparison.Ordinal);
         Assert.Contains("TrapNameTemplate", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Header=\"Shots/cycle\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Title=\"Colony Optimiser\"", xaml, StringComparison.Ordinal);
@@ -69,6 +72,8 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("function layoutSankeyLabels", source, StringComparison.Ordinal);
         Assert.DoesNotContain("mix-blend-mode: screen", source, StringComparison.Ordinal);
         Assert.Contains("elk.bundled.js", source, StringComparison.Ordinal);
+        Assert.Contains("function createElk", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script src=\"elk.bundled.js\"></script>", source, StringComparison.Ordinal);
         Assert.Contains("new ELK()", source, StringComparison.Ordinal);
         Assert.Contains("'elk.algorithm': 'layered'", source, StringComparison.Ordinal);
         Assert.Contains("'elk.edgeRouting': 'POLYLINE'", source, StringComparison.Ordinal);
@@ -105,8 +110,13 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("jobBlocks", viewModel, StringComparison.Ordinal);
         Assert.Contains("CropFarmLayouts", viewModel, StringComparison.Ordinal);
         Assert.Contains("TrapRows.ToList().ForEach(row => row.Count = 0)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("New blank plan", viewModel, StringComparison.Ordinal);
+        Assert.Contains("AtomicTextFile.WriteAsync", viewModel, StringComparison.Ordinal);
         Assert.Contains("Targets.Count == 0 && GuardRows.All(row => row.Count == 0) && TrapRows.All(row => row.Count == 0)", viewModel, StringComparison.Ordinal);
         Assert.Contains("result.IsOptimal", viewModel, StringComparison.Ordinal);
+        Assert.Contains("RecipeRowsView", xaml, StringComparison.Ordinal);
+        Assert.Contains("VirtualizingPanel.VirtualizationMode", xaml, StringComparison.Ordinal);
+        Assert.Contains("BulkObservableCollection", viewModel, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -123,7 +133,11 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("ResetVisualisationView_Click", source, StringComparison.Ordinal);
         Assert.Contains("WebMessageReceived", source, StringComparison.Ordinal);
         Assert.Contains("UpdateVisualisationLayoutAsync", source, StringComparison.Ordinal);
-        Assert.Contains("if (!_visualisationSmokeTest)", source, StringComparison.Ordinal);
+        Assert.Contains("MainTabs_SelectionChanged", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureVisualisationWebViewAsync", source, StringComparison.Ordinal);
+        Assert.Contains("QueueVisualisationRender", source, StringComparison.Ordinal);
+        Assert.Contains("TaskCompletionSource<bool>", source, StringComparison.Ordinal);
+        Assert.Contains("renderCompletion.Task.WaitAsync", source, StringComparison.Ordinal);
         Assert.Contains("_viewModel.NodeSpacing = 0", source, StringComparison.Ordinal);
         Assert.Contains("_viewModel.LayerSpacing = 0", source, StringComparison.Ordinal);
     }
@@ -230,7 +244,10 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("## [1.0.5]", changelog, StringComparison.Ordinal);
         Assert.Contains("## [1.0.6] - 2026-08-28", changelog, StringComparison.Ordinal);
         Assert.Contains("$headingPattern", workflow, StringComparison.Ordinal);
-        Assert.Contains("<Version>1.0.6</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.7</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+        Assert.Contains("last-opened or recent plans", theme, StringComparison.Ordinal);
+        Assert.Contains("last-opened plan or in the app's Recent plans list", File.ReadAllText(Path.Combine(repository, "README.md")), StringComparison.Ordinal);
+        Assert.Contains("no parsed non-player producer", File.ReadAllText(Path.Combine(repository, "docs", "SOLVER_MODEL.md")), StringComparison.Ordinal);
 
         var icon = File.ReadAllBytes(Path.Combine(repository, "src", "ColonyOptimizer.App", "Assets", "ColonyOptimizerLogo.ico"));
         var imageCount = BitConverter.ToUInt16(icon, 4);

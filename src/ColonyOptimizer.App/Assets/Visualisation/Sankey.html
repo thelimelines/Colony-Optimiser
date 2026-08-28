@@ -27,7 +27,6 @@
     <defs><marker id="arrow" viewBox="0 -5 10 10" refX="9" refY="0" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,-5L10,0L0,5" fill="#78aeb0" /></marker></defs>
   </svg>
   <script src="sankey-circular.bundle.js"></script>
-  <script src="elk.bundled.js"></script>
   <script>
     const svg = d3.select('#graph');
     const viewport = svg.append('g');
@@ -45,6 +44,23 @@
     let currentLayout = { direction: 'RIGHT', nodeSpacing: 44, layerSpacing: 96 };
     let dragFramePending = false;
     let pendingDragUpdate = null;
+    let elkLoadPromise = null;
+
+    function createElk() {
+      if (!elkLoadPromise) {
+        elkLoadPromise = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'elk.bundled.js';
+          script.onload = () => resolve();
+          script.onerror = () => {
+            elkLoadPromise = null;
+            reject(new Error('The node visualiser layout engine could not be loaded.'));
+          };
+          document.head.appendChild(script);
+        });
+      }
+      return elkLoadPromise.then(() => new ELK());
+    }
 
     function normaliseLayout(layout) {
       const nodeSpacing = Number(layout && layout.nodeSpacing);
@@ -406,6 +422,8 @@
     }
 
     async function renderNodeVisualiser(data, generation) {
+      const elk = await createElk();
+      if (generation !== renderGeneration) return null;
       const collapsedGraph = collapseItemNodes(data);
       const nodes = collapsedGraph.nodes;
       const byId = new Map(nodes.map(node => [node.id, node]));
@@ -415,7 +433,6 @@
       const layoutDirection = layoutOptions.direction;
       const nodeSpacing = layoutOptions.nodeSpacing;
       const layerSpacing = layoutOptions.layerSpacing;
-      const elk = new ELK();
       const layout = await elk.layout({
         id: 'production',
         layoutOptions: {

@@ -65,7 +65,7 @@
         <Page Name="Modify">
             <Label X="11" Y="80" Width="-11" Height="30" FontId="2" DisablePrefix="yes">#(loc.ModifyHeader)</Label>
             <Checkbox Name="RemoveColonyPlanFiles" X="11" Y="121" Width="-11" Height="17" TabStop="yes" FontId="3">Remove saved Colony Optimiser plan files</Checkbox>
-            <Label X="11" Y="143" Width="-11" Height="42" FontId="3" DisablePrefix="yes">Only the .colonyplan files listed in Recent plans are removed. Leave this unchecked to keep them.</Label>
+            <Label X="11" Y="143" Width="-11" Height="42" FontId="3" DisablePrefix="yes">Only .colonyplan files recorded as the last-opened or recent plans are removed. Leave this unchecked to keep them.</Label>
             <Button Name="ModifyUpdateButton" X="11" Y="-11" Width="200" Height="23" TabStop="yes" FontId="0" EnableCondition="WixStdBAUpdateAvailable" HideWhenDisabled="yes">#(loc.UpdateButton)</Button>
             <Button Name="RepairButton" X="-171" Y="-11" Width="75" Height="23" TabStop="yes" FontId="0" HideWhenDisabled="yes" ElevationShieldCondition="(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = &quot;PerMachine&quot;)">#(loc.ModifyRepairButton)</Button>
             <Button Name="UninstallButton" X="-91" Y="-11" Width="75" Height="23" TabStop="yes" FontId="0" ElevationShieldCondition="(WixBundleAuthoredScope = 1 AND NOT WixBundleElevated) OR ((WixBundleAuthoredScope = 2 OR WixBundleAuthoredScope = 3) AND WixStdBAScope = &quot;PerMachine&quot;)">#(loc.ModifyUninstallButton)</Button>

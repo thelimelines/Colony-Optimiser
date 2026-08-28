@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.IO;
+using ColonyOptimizer.Core;
 
 namespace ColonyOptimizer.App;
 
@@ -106,24 +107,5 @@ public static class JsonDefaults
 
 public static class FileLogger
 {
-    private static readonly string Root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ColonyOptimizer", "Logs");
-
-    public static void Write(Exception exception, string operation)
-    {
-        try
-        {
-            Directory.CreateDirectory(Root);
-            var path = Path.Combine(Root, $"colony-optimizer-{DateTime.UtcNow:yyyyMMdd}.jsonl");
-            var entry = JsonSerializer.Serialize(new { Timestamp = DateTimeOffset.UtcNow, Operation = operation, Exception = exception.GetType().FullName, exception.Message, exception.StackTrace });
-            File.AppendAllText(path, entry + Environment.NewLine);
-            foreach (var oldFile in Directory.EnumerateFiles(Root, "*.jsonl").OrderByDescending(File.GetLastWriteTimeUtc).Skip(10))
-            {
-                File.Delete(oldFile);
-            }
-        }
-        catch (Exception)
-        {
-            // Logging must never prevent the user from seeing the original error.
-        }
-    }
+    public static void Write(Exception exception, string operation) => DiagnosticLog.Write(exception, operation);
 }

@@ -51,7 +51,7 @@ To create a plan:
 3. Select **Optimise**.
 4. Review jobs, inputs, tools, and total outputs in **Results**. Miner entries are listed separately for each mined resource. The **Visualisation** tab provides an interactive Sankey and node graph; drag empty space to pan, drag nodes to arrange them, and use the mouse wheel to zoom. In **Node visualiser**, choose a rightward or downward layout and tune node and layer spacing. Recipe nodes show their required job-block count; balanced intermediate items are collapsed, while genuine surplus remains visible as an output node.
 
-Plans are saved as `.colonyplan` files. The last opened or saved plan is restored when the application next starts. Uninstall keeps plan files by default. Its optional removal choice deletes only `.colonyplan` files recorded in the app's Recent plans list.
+**New** creates a completely blank plan: it clears targets, progression, area capacity, defence, recipe policies, solver settings, and timing overrides. Plans are saved as `.colonyplan` files. The last opened or saved plan is restored when the application next starts. Uninstall keeps plan files by default. Its optional removal choice deletes only `.colonyplan` files recorded as the last-opened plan or in the app's Recent plans list.
 
 ## Game compatibility
 

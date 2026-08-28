@@ -128,7 +128,7 @@ public sealed class ProductionOptimizer
 
         foreach (var assignment in plan.Guards.Where(assignment => assignment.Count > 0))
         {
-            var guard = database.Guards.FirstOrDefault(candidate => candidate.Id.Equals(assignment.GuardTypeId, StringComparison.OrdinalIgnoreCase));
+            var guard = database.FindGuard(assignment.GuardTypeId);
             if (guard is null || guard.CooldownShotSeconds <= 0m)
             {
                 continue;
@@ -144,7 +144,7 @@ public sealed class ProductionOptimizer
 
         foreach (var assignment in plan.Traps.Where(assignment => assignment.Count > 0))
         {
-            var trap = database.Traps.FirstOrDefault(candidate => candidate.Id.Equals(assignment.TrapTypeId, StringComparison.OrdinalIgnoreCase));
+            var trap = database.FindTrap(assignment.TrapTypeId);
             if (trap is null || trap.AmmunitionCapacity <= 0 || string.IsNullOrWhiteSpace(trap.AmmunitionItemId))
             {
                 continue;
@@ -215,7 +215,7 @@ public sealed class ProductionOptimizer
                 ? layout.PlotLength
                 : Math.Max(1, source.DefaultPlotLength);
             var totalTrees = ForestryLayout.GetTreeSlotCount(plotWidth, plotLength);
-            var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(source.JobTypeId, StringComparison.OrdinalIgnoreCase));
+            var job = database.FindJob(source.JobTypeId);
             var activeSecondsPerForester = job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
             var harvestCapacityPerForester = source.GetHarvestCapacityPerForester(activeSecondsPerForester);
             if (harvestCapacityPerForester <= 0)
@@ -419,7 +419,7 @@ public sealed class ProductionOptimizer
 
     private static JobCapacity ResolveJobCapacity(GameDatabase database, ProductionPlan plan, OptimizationSettings settings, GameTiming timing, string jobTypeId)
     {
-        var job = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(jobTypeId, StringComparison.OrdinalIgnoreCase));
+        var job = database.FindJob(jobTypeId);
         var isAutomatedQueue = job?.IsAutomatedQueue ?? false;
         var isSingleBlock = job?.IsSingleBlock ?? false;
         // Queued machines run for the whole game cycle; worker-active time applies
@@ -428,9 +428,9 @@ public sealed class ProductionOptimizer
             ? timing.CycleSeconds
             : job?.ActiveSecondsPerCycle ?? timing.WorkerActiveSeconds;
         var availableMilliseconds = (long)Math.Floor(activeSeconds * MillisecondsPerSecond * Math.Clamp(settings.EfficiencyPercent, 0m, 100m) / 100m * (100m - Math.Clamp(settings.HeadroomPercent, 0m, 50m)) / 100m);
-        var toolset = database.Toolsets.FirstOrDefault(candidate => candidate.Id.Equals(job?.ToolsetId, StringComparison.OrdinalIgnoreCase));
+        var toolset = job?.ToolsetId is null ? null : database.FindToolset(job.ToolsetId);
         var candidates = (toolset?.UsableTools ?? []).Where(plan.AvailableTools.Contains)
-            .Select(toolId => database.Tools.FirstOrDefault(tool => tool.Id.Equals(toolId, StringComparison.OrdinalIgnoreCase)))
+            .Select(database.FindTool)
             .Where(tool => tool is not null)
             .Cast<ToolDefinition>()
             .ToArray();
@@ -508,13 +508,13 @@ public sealed class ProductionOptimizer
                 result.ProductionFlows.Add(new ProductionFlow
                 {
                     SourceId = $"item:{input.ItemId}",
-                    SourceLabel = database.Items.FirstOrDefault(item => item.Id.Equals(input.ItemId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(input.ItemId),
+                    SourceLabel = database.FindItem(input.ItemId)?.DisplayName ?? DisplayName.FromIdentifier(input.ItemId),
                     SourceKind = "Item",
                     SourceJobBlock = null,
                     TargetId = recipeNodeId,
                     TargetLabel = recipe.DisplayName,
                     TargetKind = "Recipe",
-                    TargetJobBlock = database.Jobs.FirstOrDefault(job => job.Id.Equals(recipe.JobTypeId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(recipe.JobTypeId),
+                    TargetJobBlock = database.FindJob(recipe.JobTypeId)?.DisplayName ?? DisplayName.FromIdentifier(recipe.JobTypeId),
                     ItemId = input.ItemId,
                     Amount = crafts * input.Amount
                 });
@@ -528,9 +528,9 @@ public sealed class ProductionOptimizer
                     SourceId = recipeNodeId,
                     SourceLabel = recipe.DisplayName,
                     SourceKind = "Recipe",
-                    SourceJobBlock = database.Jobs.FirstOrDefault(job => job.Id.Equals(recipe.JobTypeId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(recipe.JobTypeId),
+                    SourceJobBlock = database.FindJob(recipe.JobTypeId)?.DisplayName ?? DisplayName.FromIdentifier(recipe.JobTypeId),
                     TargetId = $"item:{output.ItemId}",
-                    TargetLabel = database.Items.FirstOrDefault(item => item.Id.Equals(output.ItemId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(output.ItemId),
+                    TargetLabel = database.FindItem(output.ItemId)?.DisplayName ?? DisplayName.FromIdentifier(output.ItemId),
                     TargetKind = "Item",
                     TargetJobBlock = null,
                     ItemId = output.ItemId,
@@ -563,7 +563,7 @@ public sealed class ProductionOptimizer
             result.JobRequirements.Add(new JobRequirement
             {
                 JobTypeId = job.Key,
-                JobDisplayName = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(job.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
+                JobDisplayName = database.FindJob(job.Key)?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
                 Workers = capacity.IsAutomatedQueue ? 0 : blockCount,
                 MachineBlocks = capacity.IsAutomatedQueue ? blockCount : 0,
                 IsAutomatedQueue = capacity.IsAutomatedQueue,
@@ -573,20 +573,20 @@ public sealed class ProductionOptimizer
                 SelectedToolId = capacity.SelectedToolId,
                 SelectedToolDisplayName = capacity.SelectedToolId is null
                     ? null
-                    : database.Tools.FirstOrDefault(candidate => candidate.Id.Equals(capacity.SelectedToolId, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(capacity.SelectedToolId)
+                    : database.FindTool(capacity.SelectedToolId)?.DisplayName ?? DisplayName.FromIdentifier(capacity.SelectedToolId)
             });
 
             if (!capacity.IsAutomatedQueue && capacity.IsConsumableTool)
             {
                 var toolId = capacity.SelectedToolId!;
-                var tool = database.Tools.FirstOrDefault(candidate => candidate.Id.Equals(toolId, StringComparison.OrdinalIgnoreCase));
+                var tool = database.FindTool(toolId);
                 var replacementPerCycle = recipes
                     .Where(recipe => recipe.JobTypeId.Equals(job.Key, StringComparison.OrdinalIgnoreCase))
                     .Sum(recipe => solver.Value(craftVariables[recipe.Id]) * ToolUsePerCraft(recipe, capacity));
                 result.ToolRequirements.Add(new ToolRequirement
                 {
                     JobTypeId = job.Key,
-                    JobDisplayName = database.Jobs.FirstOrDefault(candidate => candidate.Id.Equals(job.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
+                    JobDisplayName = database.FindJob(job.Key)?.DisplayName ?? DisplayName.FromIdentifier(job.Key),
                     ToolId = toolId,
                     ToolDisplayName = tool?.DisplayName ?? DisplayName.FromIdentifier(toolId),
                     Quantity = blockCount,
@@ -606,7 +606,7 @@ public sealed class ProductionOptimizer
                 result.ExternalRequirements.Add(new ExternalRequirement
                 {
                     ItemId = externalItem,
-                    ItemDisplayName = database.Items.FirstOrDefault(item => item.Id.Equals(externalItem, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(externalItem),
+                    ItemDisplayName = database.FindItem(externalItem)?.DisplayName ?? DisplayName.FromIdentifier(externalItem),
                     PerCycle = required,
                     PerMinute = timing.CycleSeconds > 0m ? required * 60m / timing.CycleSeconds : 0m,
                     IsAutomatic = !plan.ExternalItems.Contains(externalItem)
@@ -614,12 +614,12 @@ public sealed class ProductionOptimizer
             }
         }
 
-        foreach (var output in netFlows.Where(flow => flow.Value > 0m).OrderBy(flow => database.Items.FirstOrDefault(item => item.Id.Equals(flow.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? flow.Key))
+        foreach (var output in netFlows.Where(flow => flow.Value > 0m).OrderBy(flow => database.FindItem(flow.Key)?.DisplayName ?? flow.Key))
         {
             result.TotalOutputs.Add(new ProductionOutput
             {
                 ItemId = output.Key,
-                ItemDisplayName = database.Items.FirstOrDefault(item => item.Id.Equals(output.Key, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? DisplayName.FromIdentifier(output.Key),
+                ItemDisplayName = database.FindItem(output.Key)?.DisplayName ?? DisplayName.FromIdentifier(output.Key),
                 PerCycle = output.Value,
                 PerMinute = timing.CycleSeconds > 0m ? output.Value * 60m / timing.CycleSeconds : 0m
             });

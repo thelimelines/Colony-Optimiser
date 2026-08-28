@@ -26,6 +26,23 @@ public sealed record GameDataSourceInfo(
 
 public sealed class GameDatabase
 {
+    private Dictionary<string, ItemDefinition>? _itemsById;
+    private Dictionary<string, RecipeDefinition>? _recipesById;
+    private Dictionary<string, JobTypeDefinition>? _jobsById;
+    private Dictionary<string, ToolDefinition>? _toolsById;
+    private Dictionary<string, ToolsetDefinition>? _toolsetsById;
+    private Dictionary<string, ScienceDefinition>? _sciencesById;
+    private Dictionary<string, GuardTypeDefinition>? _guardsById;
+    private Dictionary<string, TrapDefinition>? _trapsById;
+    private int _itemsIndexCount = -1;
+    private int _recipesIndexCount = -1;
+    private int _jobsIndexCount = -1;
+    private int _toolsIndexCount = -1;
+    private int _toolsetsIndexCount = -1;
+    private int _sciencesIndexCount = -1;
+    private int _guardsIndexCount = -1;
+    private int _trapsIndexCount = -1;
+
     public GameDataSourceInfo Source { get; set; } = new("Unknown", string.Empty);
     public GameTiming Timing { get; set; } = GameTiming.Default;
     public List<ItemDefinition> Items { get; } = [];
@@ -41,6 +58,15 @@ public sealed class GameDatabase
     public List<TrapDefinition> Traps { get; } = [];
     public GameDataDiagnostics Diagnostics { get; } = new();
 
+    public ItemDefinition? FindItem(string id) => GetIndex(Items, ref _itemsById, ref _itemsIndexCount).GetValueOrDefault(id);
+    public RecipeDefinition? FindRecipe(string id) => GetIndex(Recipes, ref _recipesById, ref _recipesIndexCount).GetValueOrDefault(id);
+    public JobTypeDefinition? FindJob(string id) => GetIndex(Jobs, ref _jobsById, ref _jobsIndexCount).GetValueOrDefault(id);
+    public ToolDefinition? FindTool(string id) => GetIndex(Tools, ref _toolsById, ref _toolsIndexCount).GetValueOrDefault(id);
+    public ToolsetDefinition? FindToolset(string id) => GetIndex(Toolsets, ref _toolsetsById, ref _toolsetsIndexCount).GetValueOrDefault(id);
+    public ScienceDefinition? FindScience(string id) => GetIndex(Sciences, ref _sciencesById, ref _sciencesIndexCount).GetValueOrDefault(id);
+    public GuardTypeDefinition? FindGuard(string id) => GetIndex(Guards, ref _guardsById, ref _guardsIndexCount).GetValueOrDefault(id);
+    public TrapDefinition? FindTrap(string id) => GetIndex(Traps, ref _trapsById, ref _trapsIndexCount).GetValueOrDefault(id);
+
     public ItemDefinition GetOrAddItem(string id)
     {
         var item = Items.FirstOrDefault(candidate => candidate.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
@@ -51,7 +77,46 @@ public sealed class GameDatabase
 
         item = new ItemDefinition { Id = id, DisplayName = DisplayName.FromIdentifier(id), IsResolved = false };
         Items.Add(item);
+        if (_itemsById is not null)
+        {
+            _itemsById.TryAdd(id, item);
+            _itemsIndexCount = Items.Count;
+        }
         return item;
+    }
+
+    private static Dictionary<string, T> GetIndex<T>(
+        List<T> source,
+        ref Dictionary<string, T>? index,
+        ref int indexedCount)
+        where T : class
+    {
+        if (index is not null && indexedCount == source.Count)
+        {
+            return index;
+        }
+
+        var rebuilt = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in source)
+        {
+            var id = entry switch
+            {
+                ItemDefinition item => item.Id,
+                RecipeDefinition recipe => recipe.Id,
+                JobTypeDefinition job => job.Id,
+                ToolDefinition tool => tool.Id,
+                ToolsetDefinition toolset => toolset.Id,
+                ScienceDefinition science => science.Id,
+                GuardTypeDefinition guard => guard.Id,
+                TrapDefinition trap => trap.Id,
+                _ => throw new InvalidOperationException($"Unsupported ID-index type {typeof(T).Name}.")
+            };
+            rebuilt.TryAdd(id, entry);
+        }
+
+        index = rebuilt;
+        indexedCount = source.Count;
+        return rebuilt;
     }
 }
 

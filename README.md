@@ -40,9 +40,9 @@ Compare the displayed hash value with the value in the matching `.sha256` file f
 
 ## First use
 
-On first start, Colony Optimiser searches the usual Steam library locations for Colony Survival saves and lets you choose a world. You can skip this and use the planner without linking a save.
+On first start, Colony Optimiser searches the usual Steam library locations for Colony Survival saves and lets you choose a world. You can skip this and use the planner without linking a save. If you link a world before loading game data, the link is retained and its progression imports automatically once data is available.
 
-To obtain recipe data, open the settings cog and either select your installed Colony Survival game-data folder or use the in-app public-data download. The app reads a selected `world.sqlite3` save to preselect completed sciences and available tools. It never changes your save file or your game installation.
+To obtain recipe data, open the settings cog and either select your installed Colony Survival game-data folder or use the in-app public-data download. The app reads a selected `world.sqlite3` save to preselect completed sciences and available tools. For a multiplayer save, use **Import scope** to select a colony group; **All colony groups** remains the default to preserve earlier combined-import behaviour. It never changes your save file or your game installation.
 
 To create a plan:
 
@@ -51,7 +51,7 @@ To create a plan:
 3. Select **Optimise**.
 4. Review jobs, inputs, tools, and total outputs in **Results**. Miner entries are listed separately for each mined resource. The **Visualisation** tab provides an interactive Sankey and node graph; drag empty space to pan, drag nodes to arrange them, and use the mouse wheel to zoom. In **Node visualiser**, choose a rightward or downward layout and tune node and layer spacing. Recipe nodes show their required job-block count; balanced intermediate items are collapsed, while genuine surplus remains visible as an output node.
 
-**New** creates a completely blank plan: it clears targets, progression, area capacity, defence, recipe policies, solver settings, and timing overrides. Plans are saved as `.colonyplan` files. The last opened or saved plan is restored when the application next starts. Uninstall keeps plan files by default. Its optional removal choice deletes only `.colonyplan` files recorded as the last-opened plan or in the app's Recent plans list.
+**New** creates a completely blank plan: it clears targets, progression, area capacity, defence, recipe policies, solver settings, and timing overrides. Plans are saved as `.colonyplan` files. The last opened or saved plan is restored when the application next starts. When a plan was made with materially different game data, the app opens it but warns that its results may differ. Uninstall keeps plan files by default. Its optional removal choice deletes only `.colonyplan` files recorded as the last-opened plan or in the app's Recent plans list.
 
 ## Game compatibility
 

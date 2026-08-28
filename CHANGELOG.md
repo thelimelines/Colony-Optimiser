@@ -4,15 +4,24 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 ## Unreleased
 
+### Added
+
+- Read every linked save's colony groups and let multiplayer players import one group instead of always combining progress.
+
 ### Fixed
 
 - Keep existing plan and export files intact when a save or export cannot be written, and show a clear recovery message.
 - Keep Steam library discovery and public game-data cache cleanup from preventing startup or obscuring a completed update.
+- Preserve the complete current plan when changing game-data source instead of leaving a partially reset plan that could be saved accidentally.
+- Link a world cleanly before game data is loaded, then import its progression automatically after data is available.
+- Keep a crop farm's default field geometry stable through plan save and reopen.
 
 ### Changed
 
 - Resolve downloaded public game data to one recorded upstream commit before fetching it.
 - **New plan** now creates a blank plan, resetting progression, capacity, defence, solver, and timing choices to their defaults.
+- Use one 20-second solver budget across all lexicographic objectives, rather than allowing each stage a full timeout.
+- Warn non-blockingly when a plan was created against materially different game data.
 
 ## [1.0.6] - 2026-08-28
 

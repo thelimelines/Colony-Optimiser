@@ -44,6 +44,18 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void offers_a_colony_group_dropdown_for_linked_multiplayer_saves()
+    {
+        var repository = FindWorkspaceDirectory();
+        var xaml = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindow.xaml"));
+        var viewModel = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindowViewModel.cs"));
+
+        Assert.Contains("ItemsSource=\"{Binding ColonyGroupOptions}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedColonyGroup}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("All colony groups (combined", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void visualisation_uses_elk_layered_layout_with_drag_and_spacing_controls()
     {
         var repository = FindWorkspaceDirectory();
@@ -244,7 +256,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("## [1.0.5]", changelog, StringComparison.Ordinal);
         Assert.Contains("## [1.0.6] - 2026-08-28", changelog, StringComparison.Ordinal);
         Assert.Contains("$headingPattern", workflow, StringComparison.Ordinal);
-        Assert.Contains("<Version>1.0.7</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
+        Assert.Contains("<Version>1.1.0</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
         Assert.Contains("last-opened or recent plans", theme, StringComparison.Ordinal);
         Assert.Contains("last-opened plan or in the app's Recent plans list", File.ReadAllText(Path.Combine(repository, "README.md")), StringComparison.Ordinal);
         Assert.Contains("no parsed non-player producer", File.ReadAllText(Path.Combine(repository, "docs", "SOLVER_MODEL.md")), StringComparison.Ordinal);

@@ -64,6 +64,7 @@ public partial class MainWindowViewModel : ObservableObject
     public BulkObservableCollection<ProductionOutput> OutputResults { get; } = [];
     public ObservableCollection<string> RecentPlans { get; } = [];
     public ObservableCollection<WorldSaveOption> WorldSaveOptions { get; } = [];
+    public ObservableCollection<ColonyGroupImportOption> ColonyGroupOptions { get; } = [];
 
     public Array DemandUnits { get; } = Enum.GetValues(typeof(DemandUnit));
     public Array RecipePolicies { get; } = Enum.GetValues(typeof(RecipePolicy));
@@ -106,6 +107,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool isSettingsOpen;
     [ObservableProperty] private bool isWorldSelectionOpen;
     [ObservableProperty] private WorldSaveOption? selectedWorldSave;
+    [ObservableProperty] private ColonyGroupImportOption? selectedColonyGroup;
     [ObservableProperty] private string linkedSaveGamePath = string.Empty;
     [ObservableProperty] private string saveImportStatus = "No save linked.";
     [ObservableProperty] private bool useTimingOverride;
@@ -122,6 +124,8 @@ public partial class MainWindowViewModel : ObservableObject
     public string LinkedSaveGameDisplay => string.IsNullOrWhiteSpace(LinkedSaveGamePath)
         ? "No save selected. Select a world's world.sqlite3 file."
         : LinkedSaveGamePath;
+
+    public bool HasColonyGroupOptions => ColonyGroupOptions.Count > 0;
 
     public bool HasVisualisationGraph => _lastResult is { IsFeasible: true }
         && _lastResult.ProductionFlows.Any(flow => flow.Amount > 0m);
@@ -149,6 +153,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _userSettings = _settingsStore.Load();
         LinkedSaveGamePath = _userSettings.LinkedSaveGamePath ?? string.Empty;
+        await RefreshColonyGroupOptionsAsync();
         _isLoadingVisualisationSettings = true;
         try
         {
@@ -265,6 +270,11 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnSleepTimeStartChanged(decimal value) => RefreshTimingPresentation();
     partial void OnSleepTimeEndChanged(decimal value) => RefreshTimingPresentation();
     partial void OnLinkedSaveGamePathChanged(string value) => OnPropertyChanged(nameof(LinkedSaveGameDisplay));
+    partial void OnSelectedColonyGroupChanged(ColonyGroupImportOption? value)
+    {
+        _userSettings.LinkedSaveColonyGroupRowId = value?.RowId;
+        _settingsStore.Save(_userSettings);
+    }
 
     [RelayCommand]
     private void OpenSettings() => IsSettingsOpen = true;
@@ -273,7 +283,7 @@ public partial class MainWindowViewModel : ObservableObject
     private void CloseSettings() => IsSettingsOpen = false;
 
     [RelayCommand]
-    private void ChooseSaveGame()
+    private async Task ChooseSaveGameAsync()
     {
         var dialog = new OpenFileDialog
         {
@@ -287,11 +297,15 @@ public partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        LinkSaveGame(dialog.FileName, importProgression: true);
+        await LinkSaveGameAsync(dialog.FileName, importProgression: true);
     }
 
     [RelayCommand]
-    private void ImportLinkedSave() => TryApplyLinkedSave(showError: true);
+    private async Task ImportLinkedSaveAsync()
+    {
+        await RefreshColonyGroupOptionsAsync();
+        TryApplyLinkedSave(showError: true);
+    }
 
     [RelayCommand]
     private async Task DiscoverWorldSavesAsync()
@@ -312,11 +326,11 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void UseSelectedWorldSave()
+    private async Task UseSelectedWorldSaveAsync()
     {
         if (SelectedWorldSave is not null)
         {
-            LinkSaveGame(SelectedWorldSave.Path, importProgression: true);
+            await LinkSaveGameAsync(SelectedWorldSave.Path, importProgression: true);
             IsWorldSelectionOpen = false;
         }
     }
@@ -377,8 +391,9 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var selectedPath = DataDirectory;
+            var previousPlan = CaptureCurrentPlanState();
             var database = await Task.Run(() => _loader.Load(selectedPath));
-            ApplyDatabase(database);
+            ApplyDatabase(database, previousPlan);
             TryApplyLinkedSave();
             await RestoreLastPlanIfAvailableAsync();
             _userSettings.LastGameDataDirectory = database.Source.SourcePath;
@@ -422,11 +437,12 @@ public partial class MainWindowViewModel : ObservableObject
         StatusText = "Downloading public game data...";
         try
         {
+            var previousPlan = CaptureCurrentPlanState();
             var downloaded = await _acquisition.DownloadLatestAsync();
             DataDirectory = downloaded.GameDataPath;
             var database = await Task.Run(() => _loader.Load(downloaded.GameDataPath));
             database.Source = new GameDataSourceInfo("GitHub cache", downloaded.GameDataPath, database.Source.Version, downloaded.Commit, downloaded.DownloadedAt);
-            ApplyDatabase(database);
+            ApplyDatabase(database, previousPlan);
             TryApplyLinkedSave();
             await RestoreLastPlanIfAvailableAsync();
             _userSettings.LastGameDataDirectory = downloaded.GameDataPath;
@@ -595,8 +611,9 @@ public partial class MainWindowViewModel : ObservableObject
         RecipeRows.ToList().ForEach(row => row.Policy = RecipePolicy.Allowed);
         foreach (var cropSource in CropSourceRows)
         {
-            cropSource.FieldWidth = 10;
-            cropSource.FieldLength = Math.Max(1, (int)Math.Ceiling(cropSource.DefaultFieldTiles / 10m));
+            var layout = CropFarmLayout.CreateDefault(cropSource.DefaultFieldTiles);
+            cropSource.FieldWidth = layout.Width;
+            cropSource.FieldLength = layout.Length;
         }
         foreach (var forestrySource in ForestrySourceRows)
         {
@@ -667,7 +684,16 @@ public partial class MainWindowViewModel : ObservableObject
         await WriteExportAsync(dialog.FileName, JsonSerializer.Serialize(result, JsonDefaults.Options), "JSON");
     }
 
-    private void ApplyDatabase(GameDatabase database)
+    private SavedPlanDocument? CaptureCurrentPlanState() => _database is null
+        ? null
+        : new SavedPlanDocument
+        {
+            Plan = BuildPlan(),
+            Settings = BuildSettings(),
+            DataSource = _database.Source
+        };
+
+    private void ApplyDatabase(GameDatabase database, SavedPlanDocument? previousPlan = null)
     {
         IconPathToImageConverter.ClearCache();
         _database = database;
@@ -732,6 +758,11 @@ public partial class MainWindowViewModel : ObservableObject
 
         ExternalItems.Clear();
         ClearResults();
+
+        if (previousPlan is not null)
+        {
+            ApplyPlan(previousPlan.Plan, previousPlan.Settings);
+        }
     }
 
     private void RefreshItemFilter()
@@ -785,7 +816,7 @@ public partial class MainWindowViewModel : ObservableObject
             .SelectMany(row => row.RelatedRecipeIds.Select(id => new KeyValuePair<string, RecipePolicy>(id, row.Policy)))
             .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
         plan.CropFarmLayouts = CropSourceRows
-            .Where(row => row.FieldWidth != 10 || row.FieldLength != Math.Max(1, (int)Math.Ceiling(row.DefaultFieldTiles / 10m)))
+            .Where(row => !CropFarmLayout.IsDefault(row.DefaultFieldTiles, row.FieldWidth, row.FieldLength))
             .ToDictionary(row => row.Id, row => new CropFarmLayout
             {
                 Width = Math.Max(1, row.FieldWidth),
@@ -923,6 +954,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             var document = JsonSerializer.Deserialize<SavedPlanDocument>(await File.ReadAllTextAsync(path), JsonDefaults.Options)
                 ?? throw new InvalidDataException("The plan file contains no plan document.");
+            var sourceWarning = GameDataSourceComparison.GetDifferenceWarning(document.DataSource, _database?.Source);
             ApplyPlan(document.Plan, document.Settings);
             _currentPlanPath = path;
             SelectedPlanName = Path.GetFileNameWithoutExtension(path);
@@ -931,7 +963,7 @@ public partial class MainWindowViewModel : ObservableObject
             _userSettings.AddRecentPlan(path);
             _settingsStore.Save(_userSettings);
             RefreshRecentPlans();
-            StatusText = "Plan loaded";
+            StatusText = sourceWarning ?? "Plan loaded";
         }
         catch (Exception exception)
         {
@@ -975,9 +1007,9 @@ public partial class MainWindowViewModel : ObservableObject
                 continue;
             }
 
-            var tiles = Math.Max(1, cropSource.DefaultFieldTiles);
-            cropSource.FieldWidth = 1;
-            cropSource.FieldLength = tiles;
+            var defaultLayout = CropFarmLayout.CreateDefault(cropSource.DefaultFieldTiles);
+            cropSource.FieldWidth = defaultLayout.Width;
+            cropSource.FieldLength = defaultLayout.Length;
         }
         foreach (var forestrySource in ForestrySourceRows)
         {
@@ -1108,9 +1140,13 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (_database is null)
         {
-            if (showError)
+            if (File.Exists(LinkedSaveGamePath))
             {
-                ShowError("Load game data before importing a save.");
+                SaveImportStatus = "World linked — progression will import after game data is loaded.";
+            }
+            else if (showError)
+            {
+                SaveImportStatus = "No readable world.sqlite3 is linked.";
             }
             return;
         }
@@ -1122,8 +1158,11 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 LinkedSaveGamePath = detectedSave;
                 _userSettings.LinkedSaveGamePath = detectedSave;
+                _userSettings.LinkedSaveColonyGroupRowId = null;
                 _userSettings.LastWorldSaveDirectory = Path.GetDirectoryName(detectedSave);
+                ClearColonyGroupOptions();
                 _settingsStore.Save(_userSettings);
+                _ = RefreshColonyGroupOptionsAsync();
             }
         }
 
@@ -1139,7 +1178,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var imported = _saveImporter.Import(LinkedSaveGamePath);
+            var imported = _saveImporter.Import(LinkedSaveGamePath, SelectedColonyGroup?.RowId);
             foreach (var science in ScienceRows)
             {
                 science.IsSelected = imported.UnlockedScienceIds.Contains(science.Id);
@@ -1150,7 +1189,12 @@ public partial class MainWindowViewModel : ObservableObject
                 tool.IsSelected = definition?.RequiredScience is null || imported.UnlockedScienceIds.Contains(definition.RequiredScience);
             }
 
-            SaveImportStatus = $"Imported {imported.UnlockedScienceIds.Count:N0} completed sciences; tool limits now match their unlocks.";
+            var groupScope = imported.ImportedColonyGroupRowId is { } selectedRowId
+                ? $"group {selectedRowId}"
+                : imported.ImportedColonyGroupCount == 1
+                    ? "the single colony group"
+                    : $"{imported.ImportedColonyGroupCount:N0} colony groups (combined)";
+            SaveImportStatus = $"Imported {imported.UnlockedScienceIds.Count:N0} completed sciences from {groupScope}; tool limits now match their unlocks.";
             StatusText = "Save progress imported";
         }
         catch (Exception exception)
@@ -1164,16 +1208,77 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void LinkSaveGame(string path, bool importProgression)
+    private async Task LinkSaveGameAsync(string path, bool importProgression)
     {
+        var changedWorld = !path.Equals(LinkedSaveGamePath, StringComparison.OrdinalIgnoreCase);
         LinkedSaveGamePath = path;
         _userSettings.LinkedSaveGamePath = path;
+        if (changedWorld)
+        {
+            _userSettings.LinkedSaveColonyGroupRowId = null;
+            ClearColonyGroupOptions();
+        }
         _userSettings.LastWorldSaveDirectory = Path.GetDirectoryName(path);
         _settingsStore.Save(_userSettings);
+        await RefreshColonyGroupOptionsAsync();
         if (importProgression)
         {
             TryApplyLinkedSave(showError: true);
         }
+    }
+
+    private async Task RefreshColonyGroupOptionsAsync()
+    {
+        var worldPath = LinkedSaveGamePath;
+        if (!File.Exists(worldPath))
+        {
+            SetColonyGroupOptions([]);
+            return;
+        }
+
+        try
+        {
+            var groups = await Task.Run(() => _saveImporter.GetColonyGroups(worldPath));
+            if (!worldPath.Equals(LinkedSaveGamePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            SetColonyGroupOptions(groups);
+        }
+        catch (Exception exception)
+        {
+            FileLogger.Write(exception, "read-save-colony-groups");
+            if (worldPath.Equals(LinkedSaveGamePath, StringComparison.OrdinalIgnoreCase))
+            {
+                SetColonyGroupOptions([]);
+            }
+        }
+    }
+
+    private void SetColonyGroupOptions(IReadOnlyList<SaveGameColonyGroup> groups)
+    {
+        ColonyGroupOptions.Clear();
+        if (groups.Count > 0)
+        {
+            ColonyGroupOptions.Add(ColonyGroupImportOption.Combined);
+            foreach (var group in groups)
+            {
+                ColonyGroupOptions.Add(new ColonyGroupImportOption(group.RowId, group.DisplayName));
+            }
+        }
+
+        var savedRowId = _userSettings.LinkedSaveColonyGroupRowId;
+        SelectedColonyGroup = ColonyGroupOptions.FirstOrDefault(option => option.RowId == savedRowId)
+            ?? ColonyGroupOptions.FirstOrDefault();
+        OnPropertyChanged(nameof(HasColonyGroupOptions));
+    }
+
+    private void ClearColonyGroupOptions()
+    {
+        ColonyGroupOptions.Clear();
+        SelectedColonyGroup = null;
+        OnPropertyChanged(nameof(HasColonyGroupOptions));
     }
 
     private static string FormatHour(decimal value)
@@ -1386,8 +1491,9 @@ public partial class CropSourceRow : ObservableObject
         DisplayName = source.DisplayName;
         JobDisplayName = ColonyOptimizer.Core.DisplayName.FromIdentifier(source.JobTypeId);
         DefaultFieldTiles = source.DefaultFieldTiles;
-        FieldWidth = 10;
-        FieldLength = Math.Max(1, (int)Math.Ceiling(source.DefaultFieldTiles / 10m));
+        var defaultLayout = CropFarmLayout.CreateDefault(source.DefaultFieldTiles);
+        FieldWidth = defaultLayout.Width;
+        FieldLength = defaultLayout.Length;
         IconPath = database.FindItem(source.Outputs[0].ItemId)?.IconPath;
         UpdateTiming(timing);
         FertilityRequirement = source.FertilityRequirement;
@@ -1677,6 +1783,12 @@ public partial class TrapRow : ObservableObject
 public sealed record WorldSaveOption(string Path)
 {
     public string DisplayName => $"{System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(Path))} - {Path}";
+    public override string ToString() => DisplayName;
+}
+
+public sealed record ColonyGroupImportOption(long? RowId, string DisplayName)
+{
+    public static ColonyGroupImportOption Combined { get; } = new(null, "All colony groups (combined — legacy behaviour)");
     public override string ToString() => DisplayName;
 }
 

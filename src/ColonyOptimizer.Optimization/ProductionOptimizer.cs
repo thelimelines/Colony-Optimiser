@@ -1,5 +1,7 @@
 using ColonyOptimizer.Core;
 using Google.OrTools.Sat;
+using System.Diagnostics;
+using System.Globalization;
 
 namespace ColonyOptimizer.Optimization;
 
@@ -96,9 +98,10 @@ public sealed class ProductionOptimizer
                 return Scale(externalInputs + externalToolUse);
             }));
 
-        var solver = new CpSolver { StringParameters = "max_time_in_seconds: 20 num_search_workers: 8" };
+        var solver = new CpSolver();
         using var cancellationRegistration = cancellationToken.Register(solver.StopSearch);
-        var status = SolveLexicographically(model, solver, settings.Objective, automatedFallbackPenalty, totalWorkers, totalMachineBlocks, preferencePenalty, rawConsumption, workload);
+        var solveTimeLimitSeconds = Math.Clamp(settings.SolveTimeLimitSeconds, 0.1m, 300m);
+        var status = SolveLexicographically(model, solver, settings.Objective, automatedFallbackPenalty, totalWorkers, totalMachineBlocks, preferencePenalty, rawConsumption, workload, TimeSpan.FromSeconds((double)solveTimeLimitSeconds));
         result.SolverStatus = status.ToString();
         result.IsOptimal = status == CpSolverStatus.Optimal;
         if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)
@@ -109,7 +112,7 @@ public sealed class ProductionOptimizer
 
         if (!result.IsOptimal)
         {
-            result.Messages.Add(new OptimizationMessage(OptimizationMessageSeverity.Warning, "The solver reached its time limit before proving an optimum. This is a feasible approximate result."));
+            result.Messages.Add(new OptimizationMessage(OptimizationMessageSeverity.Warning, $"The solver reached its {solveTimeLimitSeconds:0.#}-second global time limit before proving an optimum. This is a feasible approximate result."));
         }
 
         PopulateResult(database, plan, timing, settings.StochasticOutputPolicy, demand, externalItems, eligibility.Recipes, craftVariables, jobBlockVariables, jobCapacities, solver, result);
@@ -446,7 +449,7 @@ public sealed class ProductionOptimizer
             isSingleBlock);
     }
 
-    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric automatedFallbacks, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload)
+    private static CpSolverStatus SolveLexicographically(CpModel model, CpSolver solver, OptimizationObjective objective, ObjectiveMetric automatedFallbacks, ObjectiveMetric totalWorkers, ObjectiveMetric totalMachineBlocks, ObjectiveMetric preferences, ObjectiveMetric rawConsumption, ObjectiveMetric workload, TimeSpan timeLimit)
     {
         var order = objective == OptimizationObjective.PreferredRecipesFirst
             ? new[] { automatedFallbacks, preferences, totalWorkers, totalMachineBlocks, workload }
@@ -454,9 +457,19 @@ public sealed class ProductionOptimizer
                 ? new[] { automatedFallbacks, rawConsumption, totalWorkers, totalMachineBlocks, preferences, workload }
                 : new[] { automatedFallbacks, totalWorkers, totalMachineBlocks, preferences, workload };
 
+        var stopwatch = Stopwatch.StartNew();
         CpSolverStatus status = CpSolverStatus.Unknown;
         foreach (var metric in order)
         {
+            var remaining = timeLimit - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                return status is CpSolverStatus.Optimal or CpSolverStatus.Feasible
+                    ? CpSolverStatus.Feasible
+                    : CpSolverStatus.Unknown;
+            }
+
+            solver.StringParameters = $"max_time_in_seconds: {remaining.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture)} num_search_workers: 8";
             model.Minimize(metric.Expression);
             status = solver.Solve(model);
             if (status is not CpSolverStatus.Optimal and not CpSolverStatus.Feasible)

@@ -879,6 +879,52 @@ public sealed class ProductionOptimizerTests
     }
 
     [Fact]
+    public void can_preview_and_import_one_colony_group_without_combining_multiplayer_progress()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"colony-optimizer-{Guid.NewGuid():N}");
+        var worldPath = Path.Combine(root, "world.sqlite3");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
+                    CREATE TABLE colonygroups (json TEXT);
+                    INSERT INTO science_mapping (name, [index]) VALUES ('pipliz.farming', 2), ('pipliz.forestry', 7);
+                    INSERT INTO colonygroups (json) VALUES ('{"name":"North","science":{"completed":[2]}}');
+                    INSERT INTO colonygroups (json) VALUES ('{"colonyName":"South","science":{"completed":[7]}}');
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var importer = new SaveGameImportService();
+            var groups = importer.GetColonyGroups(worldPath);
+            var north = Assert.Single(groups, group => group.Label == "North");
+
+            var selected = importer.Import(worldPath, north.RowId);
+            var combined = importer.Import(worldPath);
+
+            Assert.Equal(2, groups.Count);
+            Assert.Equal(1, north.CompletedScienceIndexCount);
+            Assert.Equal(north.RowId, selected.ImportedColonyGroupRowId);
+            Assert.Equal(1, selected.ImportedColonyGroupCount);
+            Assert.Equal(["pipliz.farming"], selected.UnlockedScienceIds);
+            Assert.Equal(2, combined.ImportedColonyGroupCount);
+            Assert.Equal(2, combined.UnlockedScienceIds.Count);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
+        }
+    }
+
+    [Fact]
     public void finds_the_last_launched_world_database()
     {
         var root = Path.Combine(Path.GetTempPath(), $"colony-optimizer-{Guid.NewGuid():N}");

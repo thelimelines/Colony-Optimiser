@@ -766,7 +766,12 @@
                                 <GroupBox Header="Progression save">
                                     <StackPanel>
                                         <TextBlock Text="Select the world.sqlite3 file inside the Colony Survival save folder, then import it to set completed sciences and available tools. The app remembers the last save folder." Foreground="#D2E3E3" TextWrapping="Wrap" />
-                                <TextBox Text="{Binding LinkedSaveGameDisplay, Mode=OneWay}" IsReadOnly="True" Margin="0,10,0,0" />
+                                        <TextBox Text="{Binding LinkedSaveGameDisplay, Mode=OneWay}" IsReadOnly="True" Margin="0,10,0,0" />
+                                        <StackPanel Margin="0,10,0,0" Visibility="{Binding HasColonyGroupOptions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <TextBlock Text="Import scope" Foreground="#D2E3E3" />
+                                            <ComboBox ItemsSource="{Binding ColonyGroupOptions}" SelectedItem="{Binding SelectedColonyGroup}" Margin="0,4,0,0" />
+                                            <TextBlock Text="For multiplayer saves, select one colony group. Combined import preserves the previous behaviour." Foreground="#A9CCCC" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                        </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                             <Button Style="{StaticResource PrimaryButton}" Content="Select world.sqlite3" Command="{Binding ChooseSaveGameCommand}" />
                                             <Button Content="Import progression" Command="{Binding ImportLinkedSaveCommand}" />

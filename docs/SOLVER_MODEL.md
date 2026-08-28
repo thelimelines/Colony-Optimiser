@@ -74,6 +74,8 @@ The default `FewestWorkers` lexicographic objective then:
 
 Preferred-recipes-first then minimises non-preferred crafts, worker blocks, machine blocks, and workload. Lowest-raw-resource-consumption then minimises inputs with no parsed non-player producer, worker blocks, machine blocks, preferences, and workload. It does not invent gathering rates.
 
+All lexicographic stages share one global 20-second solver budget by default. If that budget expires after a feasible solution is found, the result is marked approximate rather than spending another full time limit on each remaining objective.
+
 ## External materials
 
 Explicit external items and inputs with no parsed non-player producer have no material-balance constraint. After solving, their net unmet consumption is calculated from demand and recipe flows and displayed as an external requirement. This keeps unsupported gathering mechanics visible rather than fabricating production rates. Science-gated and forbidden producers are not automatically reclassified as external sources, as described under [Recipe eligibility](#recipe-eligibility).

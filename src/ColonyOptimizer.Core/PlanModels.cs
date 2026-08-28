@@ -88,6 +88,8 @@ public sealed class OptimizationSettings
     public StochasticOutputPolicy StochasticOutputPolicy { get; set; } = StochasticOutputPolicy.ExpectedValue;
     public int MaxCraftsPerRecipe { get; set; } = 100_000;
     public int MaxWorkersPerJob { get; set; } = 10_000;
+    /// <summary>One shared time budget for all lexicographic solver stages.</summary>
+    public decimal SolveTimeLimitSeconds { get; set; } = 20m;
     public TimingOverride TimingOverride { get; set; } = new();
 }
 
@@ -105,6 +107,18 @@ public sealed class CropFarmLayout
 {
     public int Width { get; set; }
     public int Length { get; set; }
+
+    public static CropFarmLayout CreateDefault(int defaultFieldTiles) => new()
+    {
+        Width = 10,
+        Length = Math.Max(1, (int)Math.Ceiling(Math.Max(1, defaultFieldTiles) / 10m))
+    };
+
+    public static bool IsDefault(int defaultFieldTiles, int width, int length)
+    {
+        var layout = CreateDefault(defaultFieldTiles);
+        return width == layout.Width && length == layout.Length;
+    }
 }
 
 public sealed class TimingOverride

@@ -1,7 +1,9 @@
 using System.IO.Compression;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using ColonyOptimizer.App;
+using ColonyOptimizer.Core;
 using ColonyOptimizer.GameData;
 
 namespace ColonyOptimizer.Tests;
@@ -63,6 +65,92 @@ public sealed class PreReleaseSafetyTests : IDisposable
         Assert.Equal(ColonyOptimizer.Core.OptimizationObjective.FewestWorkers, viewModel.SelectedObjective);
         Assert.Equal(ColonyOptimizer.Core.StochasticOutputPolicy.ExpectedValue, viewModel.SelectedStochasticPolicy);
         Assert.Equal("Untitled plan", viewModel.SelectedPlanName);
+    }
+
+    [Fact]
+    public void changing_game_data_reapplies_the_complete_current_plan()
+    {
+        var viewModel = new MainWindowViewModel();
+        Invoke(viewModel, "ApplyDatabase", CreateSwitchDatabase("first"), null);
+        viewModel.SelectedPlanName = "Shared colony";
+        viewModel.Targets.Add(new DemandRow("output", "Output", 12m, DemandUnit.PerMinute));
+        viewModel.ExternalItems.Add(new ExternalItemRow("ammo", "Ammo"));
+        viewModel.ScienceRows.Single().IsSelected = true;
+        viewModel.ToolRows.Single().IsSelected = true;
+        viewModel.CropSourceRows.Single().FieldWidth = 7;
+        viewModel.CropSourceRows.Single().FieldLength = 8;
+        viewModel.RecipeRows.Single().Policy = RecipePolicy.Forbidden;
+        viewModel.GuardRows.Single().Count = 3;
+        viewModel.GuardRows.Single().AmmoMode = GuardAmmoMode.CustomRoundsPerCycle;
+        viewModel.GuardRows.Single().CustomRoundsPerCycle = 4;
+        viewModel.TrapRows.Single().Count = 2;
+        viewModel.EfficiencyPercent = 82m;
+        viewModel.HeadroomPercent = 9m;
+        viewModel.SelectedObjective = OptimizationObjective.LowestRawResourceConsumption;
+        viewModel.SelectedStochasticPolicy = StochasticOutputPolicy.Conservative;
+        viewModel.UseTimingOverride = true;
+        viewModel.GameTimeScale = 90m;
+
+        var snapshot = Assert.IsType<SavedPlanDocument>(Invoke(viewModel, "CaptureCurrentPlanState"));
+        Invoke(viewModel, "ApplyDatabase", CreateSwitchDatabase("second"), snapshot);
+        var restored = Assert.IsType<ProductionPlan>(Invoke(viewModel, "BuildPlan"));
+        var settings = Assert.IsType<OptimizationSettings>(Invoke(viewModel, "BuildSettings"));
+
+        Assert.Equal("Shared colony", restored.Name);
+        Assert.Equal(12m, Assert.Single(restored.Targets).Amount);
+        Assert.Contains("ammo", restored.ExternalItems);
+        Assert.Contains("science", restored.UnlockedSciences);
+        Assert.Contains("tools", restored.AvailableTools);
+        var crop = Assert.Single(restored.CropFarmLayouts).Value;
+        Assert.Equal(7, crop.Width);
+        Assert.Equal(8, crop.Length);
+        Assert.Equal(RecipePolicy.Forbidden, restored.RecipePolicies["recipe-one"]);
+        var guard = Assert.Single(restored.Guards);
+        Assert.Equal(3, guard.Count);
+        Assert.Equal(GuardAmmoMode.CustomRoundsPerCycle, guard.AmmoMode);
+        Assert.Equal(4, guard.CustomRoundsPerCycle);
+        Assert.Equal(2, Assert.Single(restored.Traps).Count);
+        Assert.Equal(82m, settings.EfficiencyPercent);
+        Assert.Equal(9m, settings.HeadroomPercent);
+        Assert.Equal(OptimizationObjective.LowestRawResourceConsumption, settings.Objective);
+        Assert.Equal(StochasticOutputPolicy.Conservative, settings.StochasticOutputPolicy);
+        Assert.True(settings.TimingOverride.IsEnabled);
+        Assert.Equal(90m, settings.TimingOverride.GameTimeScale);
+    }
+
+    [Fact]
+    public void linking_a_world_before_game_data_is_loaded_is_not_an_error()
+    {
+        Directory.CreateDirectory(_root);
+        var worldPath = Path.Combine(_root, "world.sqlite3");
+        File.WriteAllBytes(worldPath, []);
+        var viewModel = new MainWindowViewModel { LinkedSaveGamePath = worldPath };
+
+        Invoke(viewModel, "TryApplyLinkedSave", true);
+
+        Assert.Equal("World linked — progression will import after game data is loaded.", viewModel.SaveImportStatus);
+    }
+
+    [Fact]
+    public void plan_provenance_warns_only_for_materially_different_data()
+    {
+        var github = new GameDataSourceInfo("GitHub cache", "cache", Version: "1.2", Commit: "abc");
+
+        Assert.Null(GameDataSourceComparison.GetDifferenceWarning(github, github));
+        Assert.Contains("Results may differ", GameDataSourceComparison.GetDifferenceWarning(github, github with { Commit = "def" }));
+        Assert.Contains("Results may differ", GameDataSourceComparison.GetDifferenceWarning(github with { Commit = null }, github with { Commit = null, Version = "1.3" }));
+        Assert.Null(GameDataSourceComparison.GetDifferenceWarning(null, github));
+    }
+
+    [Fact]
+    public void default_crop_layout_has_one_canonical_geometry()
+    {
+        var layout = CropFarmLayout.CreateDefault(100);
+
+        Assert.Equal(10, layout.Width);
+        Assert.Equal(10, layout.Length);
+        Assert.True(CropFarmLayout.IsDefault(100, layout.Width, layout.Length));
+        Assert.False(CropFarmLayout.IsDefault(100, 1, 100));
     }
 
     [Fact]
@@ -161,5 +249,64 @@ public sealed class PreReleaseSafetyTests : IDisposable
 
             return stream.ToArray();
         }
+    }
+
+    private static object? Invoke(MainWindowViewModel viewModel, string methodName, params object?[] arguments) =>
+        typeof(MainWindowViewModel).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(viewModel, arguments);
+
+    private static GameDatabase CreateSwitchDatabase(string sourcePath)
+    {
+        var database = new GameDatabase
+        {
+            Source = new GameDataSourceInfo("Test data", sourcePath, Version: "1.0")
+        };
+        database.Items.AddRange(
+        [
+            new ItemDefinition { Id = "output", DisplayName = "Output" },
+            new ItemDefinition { Id = "ammo", DisplayName = "Ammo" },
+            new ItemDefinition { Id = "tools", DisplayName = "Tools" }
+        ]);
+        database.Sciences.Add(new ScienceDefinition { Id = "science", DisplayName = "Science" });
+        database.Tools.Add(new ToolDefinition { Id = "tools", DisplayName = "Tools" });
+        database.Recipes.AddRange(
+        [
+            Recipe("recipe-one", "First recipe"),
+            Recipe("recipe-two", "Second recipe")
+        ]);
+        var crop = new CropFarmSourceDefinition
+        {
+            Id = "crop",
+            DisplayName = "Crop",
+            JobTypeId = "worker",
+            DefaultFieldTiles = 100,
+            GrowthCyclesPerHarvest = 1m
+        };
+        crop.Outputs.Add(new ItemAmount("output", 1m));
+        database.CropFarmSources.Add(crop);
+        var guard = new GuardTypeDefinition
+        {
+            Id = "guard",
+            DisplayName = "Guard",
+            NpcTypeId = "guard",
+            CooldownShotSeconds = 1m
+        };
+        guard.Ammunition.Add(new ItemAmount("ammo", 1m));
+        database.Guards.Add(guard);
+        database.Traps.Add(new TrapDefinition
+        {
+            Id = "trap",
+            DisplayName = "Trap",
+            AmmunitionItemId = "ammo",
+            AmmunitionCapacity = 1,
+            ReloadSecondsPerAmmunition = 1m
+        });
+        return database;
+    }
+
+    private static RecipeDefinition Recipe(string id, string displayName)
+    {
+        var recipe = new RecipeDefinition { Id = id, DisplayName = displayName, JobTypeId = "worker", CooldownSeconds = 1m };
+        recipe.Outputs.Add(new ItemAmount("output", 1m));
+        return recipe;
     }
 }

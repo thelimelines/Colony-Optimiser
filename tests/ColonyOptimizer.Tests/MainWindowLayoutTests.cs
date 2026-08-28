@@ -56,6 +56,22 @@ public sealed class MainWindowLayoutTests
     }
 
     [Fact]
+    public void results_header_includes_a_hoverable_food_coverage_indicator()
+    {
+        var repository = FindWorkspaceDirectory();
+        var xaml = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindow.xaml"));
+        var viewModel = File.ReadAllText(Path.Combine(repository, "src", "ColonyOptimizer.App", "MainWindowViewModel.cs"));
+
+        Assert.Contains("FoodCoverage.Label", xaml, StringComparison.Ordinal);
+        Assert.Contains("FoodCoverage.Tooltip", xaml, StringComparison.Ordinal);
+        Assert.Contains("FoodCoverageLevel.Sufficient", xaml, StringComparison.Ordinal);
+        Assert.Contains("FoodCoverageLevel.Cautious", xaml, StringComparison.Ordinal);
+        Assert.Contains("FoodCoverageLevel.NotRequired", xaml, StringComparison.Ordinal);
+        Assert.Contains("CoveragePercent > 110m", viewModel, StringComparison.Ordinal);
+        Assert.Contains("CoveragePercent >= 100m", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void visualisation_uses_elk_layered_layout_with_drag_and_spacing_controls()
     {
         var repository = FindWorkspaceDirectory();

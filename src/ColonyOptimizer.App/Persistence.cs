@@ -16,6 +16,7 @@ public sealed class UserSettings
 {
     public string? LastGameDataDirectory { get; set; }
     public string? LinkedSaveGamePath { get; set; }
+    public string? LinkedSaveColonyGroupIdentity { get; set; }
     public long? LinkedSaveColonyGroupRowId { get; set; }
     public string? LastWorldSaveDirectory { get; set; }
     public bool HasCompletedInitialWorldDiscovery { get; set; }

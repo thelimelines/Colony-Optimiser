@@ -163,13 +163,45 @@ public sealed class PreReleaseSafetyTests : IDisposable
         viewModel.ScienceRows.Single().IsSelected = true;
         viewModel.ToolRows.Single().IsSelected = true;
         typeof(MainWindowViewModel).GetField("selectedColonyGroup", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(viewModel, new ColonyGroupImportOption(1, "Malformed group"));
+            .SetValue(viewModel, new ColonyGroupImportOption(1, null, "Malformed group"));
 
         Invoke(viewModel, "TryApplyLinkedSave", false);
 
         Assert.True(viewModel.ScienceRows.Single().IsSelected);
         Assert.True(viewModel.ToolRows.Single().IsSelected);
         Assert.Equal("The selected colony group could not be read; existing progression was not changed.", viewModel.SaveImportStatus);
+    }
+
+    [Fact]
+    public void a_legacy_rowid_colony_group_selection_requires_a_new_choice_before_importing()
+    {
+        Directory.CreateDirectory(_root);
+        var worldPath = Path.Combine(_root, "legacy-rowid-world.sqlite3");
+        typeof(SaveGameImportService).GetMethod("EnsureSqliteProvider", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, null);
+        using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
+                CREATE TABLE colonygroups (json TEXT);
+                INSERT INTO science_mapping (name, [index]) VALUES ('science', 1);
+                INSERT INTO colonygroups (json) VALUES ('{"science":{"completed":[1]}}');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var viewModel = new MainWindowViewModel { LinkedSaveGamePath = worldPath };
+        Invoke(viewModel, "ApplyDatabase", CreateSwitchDatabase("first"), null);
+        viewModel.ScienceRows.Single().IsSelected = true;
+        typeof(MainWindowViewModel).GetField("selectedColonyGroup", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(viewModel, ColonyGroupImportOption.Legacy(1));
+
+        Invoke(viewModel, "TryApplyLinkedSave", false);
+
+        Assert.True(viewModel.ScienceRows.Single().IsSelected);
+        Assert.Equal("The saved colony-group selection could not be verified. Choose a current import scope before importing progression.", viewModel.SaveImportStatus);
     }
 
     [Fact]

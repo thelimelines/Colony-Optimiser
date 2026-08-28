@@ -103,6 +103,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private StochasticOutputPolicy selectedStochasticPolicy = StochasticOutputPolicy.ExpectedValue;
     [ObservableProperty] private string resultHeadline = "No calculation yet";
     [ObservableProperty] private string resultDetail = "Add production targets, configure progression, then optimise.";
+    [ObservableProperty] private FoodCoverageSummary? foodCoverage;
     [ObservableProperty] private string selectedPlanName = "Untitled plan";
     [ObservableProperty] private bool isSettingsOpen;
     [ObservableProperty] private bool isWorldSelectionOpen;
@@ -126,6 +127,8 @@ public partial class MainWindowViewModel : ObservableObject
         : LinkedSaveGamePath;
 
     public bool HasColonyGroupOptions => ColonyGroupOptions.Count > 0;
+
+    public bool HasFoodCoverage => FoodCoverage is not null;
 
     public bool HasVisualisationGraph => _lastResult is { IsFeasible: true }
         && _lastResult.ProductionFlows.Any(flow => flow.Amount > 0m);
@@ -272,9 +275,16 @@ public partial class MainWindowViewModel : ObservableObject
     partial void OnLinkedSaveGamePathChanged(string value) => OnPropertyChanged(nameof(LinkedSaveGameDisplay));
     partial void OnSelectedColonyGroupChanged(ColonyGroupImportOption? value)
     {
-        _userSettings.LinkedSaveColonyGroupRowId = value?.RowId;
+        if (value?.RequiresReselection == true)
+        {
+            return;
+        }
+
+        _userSettings.LinkedSaveColonyGroupIdentity = value?.StableIdentity;
+        _userSettings.LinkedSaveColonyGroupRowId = null;
         _settingsStore.Save(_userSettings);
     }
+    partial void OnFoodCoverageChanged(FoodCoverageSummary? value) => OnPropertyChanged(nameof(HasFoodCoverage));
 
     [RelayCommand]
     private void OpenSettings() => IsSettingsOpen = true;
@@ -896,12 +906,14 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (result.IsFeasible)
         {
+            FoodCoverage = _database is null ? null : FoodCoverageSummary.Calculate(_database, result);
             var exactness = result.IsOptimal ? string.Empty : " (approximate)";
             ResultHeadline = $"{result.TotalWorkers:N0} production workers + {result.TotalMachineBlocks:N0} machine blocks{exactness}";
             ResultDetail = $"{result.JobRequirements.Count} job types | {result.RecipeAllocations.Count(allocation => allocation.IsAutomatedQueue)} queued machine outputs | {result.TotalOutputs.Count} planned outputs | {result.ExternalRequirements.Count} external inputs | solver {result.SolverStatus} | cycle {EffectiveTiming.CycleSeconds / 60m:0.##} minutes";
         }
         else
         {
+            FoodCoverage = null;
             ResultHeadline = "No feasible production plan";
             ResultDetail = string.Join(Environment.NewLine, result.Messages.Select(message => message.Text));
         }
@@ -915,6 +927,7 @@ public partial class MainWindowViewModel : ObservableObject
         ExternalResults.Clear();
         OutputResults.Clear();
         _lastResult = null;
+        FoodCoverage = null;
         SankeyGraphJson = "{\"mode\":0,\"nodes\":[],\"links\":[]}";
         ResultHeadline = "No calculation yet";
         ResultDetail = "Add production targets, configure progression, then optimise.";
@@ -1179,6 +1192,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 LinkedSaveGamePath = detectedSave;
                 _userSettings.LinkedSaveGamePath = detectedSave;
+                _userSettings.LinkedSaveColonyGroupIdentity = null;
                 _userSettings.LinkedSaveColonyGroupRowId = null;
                 _userSettings.LastWorldSaveDirectory = Path.GetDirectoryName(detectedSave);
                 ClearColonyGroupOptions();
@@ -1199,7 +1213,18 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var imported = _saveImporter.Import(LinkedSaveGamePath, SelectedColonyGroup?.RowId);
+            if (SelectedColonyGroup?.RequiresReselection == true
+                || (SelectedColonyGroup is null && (!string.IsNullOrWhiteSpace(_userSettings.LinkedSaveColonyGroupIdentity) || _userSettings.LinkedSaveColonyGroupRowId is not null)))
+            {
+                SaveImportStatus = "The saved colony-group selection could not be verified. Choose a current import scope before importing progression.";
+                if (showError)
+                {
+                    ShowError(SaveImportStatus);
+                }
+                return;
+            }
+
+            var imported = _saveImporter.Import(LinkedSaveGamePath, SelectedColonyGroup?.Selection);
             foreach (var science in ScienceRows)
             {
                 science.IsSelected = imported.UnlockedScienceIds.Contains(science.Id);
@@ -1210,8 +1235,8 @@ public partial class MainWindowViewModel : ObservableObject
                 tool.IsSelected = definition?.RequiredScience is null || imported.UnlockedScienceIds.Contains(definition.RequiredScience);
             }
 
-            var groupScope = imported.ImportedColonyGroupRowId is { } selectedRowId
-                ? $"group {selectedRowId}"
+            var groupScope = imported.ImportedColonyGroupIdentity is not null
+                ? "the selected colony group"
                 : imported.ImportedColonyGroupCount == 1
                     ? "the single colony group"
                     : $"{imported.ImportedColonyGroupCount:N0} colony groups (combined)";
@@ -1254,6 +1279,7 @@ public partial class MainWindowViewModel : ObservableObject
         _userSettings.LinkedSaveGamePath = path;
         if (changedWorld)
         {
+            _userSettings.LinkedSaveColonyGroupIdentity = null;
             _userSettings.LinkedSaveColonyGroupRowId = null;
             ClearColonyGroupOptions();
         }
@@ -1313,15 +1339,22 @@ public partial class MainWindowViewModel : ObservableObject
             ColonyGroupOptions.Add(ColonyGroupImportOption.Combined);
             foreach (var group in groups)
             {
-                ColonyGroupOptions.Add(new ColonyGroupImportOption(group.RowId, group.DisplayName));
+                ColonyGroupOptions.Add(ColonyGroupImportOption.FromGroup(group));
             }
         }
 
-        var savedRowId = _userSettings.LinkedSaveColonyGroupRowId;
-        var selectedOption = ColonyGroupOptions.FirstOrDefault(option => option.RowId == savedRowId);
-        if (selectedOption is null && savedRowId is { } missingRowId)
+        var savedIdentity = _userSettings.LinkedSaveColonyGroupIdentity;
+        var selectedOption = !string.IsNullOrWhiteSpace(savedIdentity)
+            ? ColonyGroupOptions.FirstOrDefault(option => option.StableIdentity == savedIdentity)
+            : null;
+        if (selectedOption is null && !string.IsNullOrWhiteSpace(savedIdentity))
         {
-            selectedOption = ColonyGroupImportOption.Missing(missingRowId);
+            selectedOption = ColonyGroupImportOption.Missing(savedIdentity);
+            ColonyGroupOptions.Add(selectedOption);
+        }
+        else if (selectedOption is null && _userSettings.LinkedSaveColonyGroupRowId is { } legacyRowId)
+        {
+            selectedOption = ColonyGroupImportOption.Legacy(legacyRowId);
             ColonyGroupOptions.Add(selectedOption);
         }
 
@@ -1841,11 +1874,74 @@ public sealed record WorldSaveOption(string Path)
     public override string ToString() => DisplayName;
 }
 
-public sealed record ColonyGroupImportOption(long? RowId, string DisplayName)
+public sealed record ColonyGroupImportOption(long? RowId, string? StableIdentity, string DisplayName, bool RequiresReselection = false)
 {
-    public static ColonyGroupImportOption Combined { get; } = new(null, "All colony groups (combined — legacy behaviour)");
-    public static ColonyGroupImportOption Missing(long rowId) => new(rowId, $"Group {rowId} is no longer present — choose another scope");
+    public SaveGameColonyGroupSelection? Selection => RowId is null && StableIdentity is null
+        ? null
+        : new SaveGameColonyGroupSelection(RowId, StableIdentity);
+    public static ColonyGroupImportOption Combined { get; } = new(null, null, "All colony groups (combined — legacy behaviour)");
+    public static ColonyGroupImportOption FromGroup(SaveGameColonyGroup group) => new(
+        group.RowId,
+        group.StableIdentity,
+        group.StableIdentity is null ? $"{group.DisplayName} (not persisted: save has no explicit group ID)" : group.DisplayName);
+    public static ColonyGroupImportOption Missing(string stableIdentity) => new(null, stableIdentity, "Saved colony group is no longer present — choose another scope", true);
+    public static ColonyGroupImportOption Legacy(long rowId) => new(null, null, $"Previously saved group {rowId} must be selected again — choose another scope", true);
     public override string ToString() => DisplayName;
+}
+
+public enum FoodCoverageLevel
+{
+    Sufficient,
+    Cautious,
+    Insufficient,
+    NotRequired
+}
+
+public sealed record FoodCoverageSummary(
+    long ProductionWorkers,
+    long Guards,
+    decimal MealsAvailablePerCycle,
+    decimal MealsRequiredPerCycle)
+{
+    public decimal CoveragePercent => MealsRequiredPerCycle <= 0m ? 0m : MealsAvailablePerCycle / MealsRequiredPerCycle * 100m;
+    public decimal MealBalancePerCycle => MealsAvailablePerCycle - MealsRequiredPerCycle;
+    public FoodCoverageLevel Level => MealsRequiredPerCycle <= 0m
+        ? FoodCoverageLevel.NotRequired
+        : CoveragePercent > 110m
+            ? FoodCoverageLevel.Sufficient
+            : CoveragePercent >= 100m
+                ? FoodCoverageLevel.Cautious
+                : FoodCoverageLevel.Insufficient;
+    public string Label => MealsRequiredPerCycle <= 0m ? "Food: no colonists" : $"Food: {CoveragePercent:0.#}%";
+
+    public string Tooltip
+    {
+        get
+        {
+            if (MealsRequiredPerCycle <= 0m)
+            {
+                return "No production workers or guards need meals in this plan. Machine blocks are not colonists.";
+            }
+
+            var balance = MealBalancePerCycle >= 0m
+                ? $"{MealBalancePerCycle:0.##} meals extra"
+                : $"{-MealBalancePerCycle:0.##} meals short";
+            return $"Per game day (cycle): {MealsAvailablePerCycle:0.##} meals available; {MealsRequiredPerCycle:0.##} required for {ProductionWorkers:N0} production workers and {Guards:N0} guards. {balance}. Existing or idle colonists are not included.";
+        }
+    }
+
+    public static FoodCoverageSummary Calculate(GameDatabase database, OptimizationResult result)
+    {
+        var foodItemIds = database.Items
+            .Where(item => item.Category?.Equals("food", StringComparison.OrdinalIgnoreCase) == true)
+            .Select(item => item.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var producedMeals = result.TotalOutputs
+            .Where(output => foodItemIds.Contains(output.ItemId))
+            .Sum(output => output.PerCycle);
+        var requiredMeals = result.TotalWorkers + result.TotalGuards;
+        return new FoodCoverageSummary(result.TotalWorkers, result.TotalGuards, producedMeals, requiredMeals);
+    }
 }
 
 public enum NodeLayoutDirection

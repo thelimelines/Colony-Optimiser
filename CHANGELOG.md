@@ -8,7 +8,9 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 ### Added
 
-- Read every linked save's colony groups and let multiplayer players import one group instead of always combining progress.
+- Read every accessible multiplayer save's colony groups and let players import one group instead of always combining progress. Local hosts, dedicated-server administrators, and players with a server-save copy can use this; remote clients without that save configure progression manually.
+- Persist a selected colony group only when its save has an explicit stable primary key, so a stale SQLite row identifier cannot silently import a different group.
+- Show a colour-coded food coverage indicator in feasible results, including planned production workers and guards, with a hoverable per-cycle meal surplus or shortfall.
 
 ### Fixed
 

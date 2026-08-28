@@ -599,7 +599,31 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="{Binding ResultHeadline}" FontSize="21" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding ResultHeadline}" FontSize="21" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                        <Border Padding="8,3" Margin="10,0,0,0" CornerRadius="4" VerticalAlignment="Center" Visibility="{Binding HasFoodCoverage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#B84A4A" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding FoodCoverage.Level}" Value="{x:Static local:FoodCoverageLevel.Sufficient}">
+                                                            <Setter Property="Background" Value="#187A5A" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding FoodCoverage.Level}" Value="{x:Static local:FoodCoverageLevel.Cautious}">
+                                                            <Setter Property="Background" Value="#A87512" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding FoodCoverage.Level}" Value="{x:Static local:FoodCoverageLevel.NotRequired}">
+                                                            <Setter Property="Background" Value="#476E76" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Border.ToolTip>
+                                                <TextBlock Text="{Binding FoodCoverage.Tooltip}" TextWrapping="Wrap" MaxWidth="360" />
+                                            </Border.ToolTip>
+                                            <TextBlock Text="{Binding FoodCoverage.Label}" FontWeight="SemiBold" Foreground="White" />
+                                        </Border>
+                                    </StackPanel>
                                     <TextBlock Text="{Binding ResultDetail}" Foreground="#E0EEEE" TextWrapping="Wrap" Margin="0,5,0,0" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">

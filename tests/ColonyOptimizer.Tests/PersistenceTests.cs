@@ -33,6 +33,24 @@ public sealed class PersistenceTests : IDisposable
         Assert.Null(exception);
     }
 
+    [Fact]
+    public void saves_a_stable_colony_group_identity_without_relying_on_a_sqlite_rowid()
+    {
+        var store = new UserSettingsStore(_root);
+        store.Save(new UserSettings
+        {
+            LinkedSaveGamePath = "world.sqlite3",
+            LinkedSaveColonyGroupIdentity = "A1B2C3",
+            LinkedSaveColonyGroupRowId = null
+        });
+
+        var reopened = store.Load();
+
+        Assert.Equal("world.sqlite3", reopened.LinkedSaveGamePath);
+        Assert.Equal("A1B2C3", reopened.LinkedSaveColonyGroupIdentity);
+        Assert.Null(reopened.LinkedSaveColonyGroupRowId);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

@@ -639,6 +639,7 @@ public sealed class ProductionOptimizerTests
 
         Assert.True(result.Demand["bolt"].GuardPerCycle > 0m);
         Assert.Equal(result.Demand["bolt"].GuardPerCycle, result.ExternalRequirements.Single().PerCycle);
+        Assert.Equal(2, result.TotalGuards);
     }
 
     [Fact]
@@ -892,10 +893,17 @@ public sealed class ProductionOptimizerTests
                 using var command = connection.CreateCommand();
                 command.CommandText = """
                     CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
-                    CREATE TABLE colonygroups (json TEXT);
+                    CREATE TABLE colonygroups (
+                        id INTEGER PRIMARY KEY,
+                        json TEXT,
+                        points INTEGER,
+                        creation_date INTEGER,
+                        main_colony INTEGER,
+                        stats BLOB
+                    );
                     INSERT INTO science_mapping (name, [index]) VALUES ('pipliz.farming', 2), ('pipliz.forestry', 7);
-                    INSERT INTO colonygroups (json) VALUES ('{"name":"North","science":{"completed":[2]}}');
-                    INSERT INTO colonygroups (json) VALUES ('{"colonyName":"South","science":{"completed":[7]}}');
+                    INSERT INTO colonygroups (id, json, points, creation_date, main_colony) VALUES (1, '{"name":"North","science":{"completed":[2]}}', 0, 1, 1);
+                    INSERT INTO colonygroups (id, json, points, creation_date, main_colony) VALUES (2, '{"colonyName":"South","science":{"completed":[7]}}', 0, 2, 0);
                     """;
                 command.ExecuteNonQuery();
             }
@@ -904,21 +912,79 @@ public sealed class ProductionOptimizerTests
             var groups = importer.GetColonyGroups(worldPath);
             var north = Assert.Single(groups, group => group.Label == "North");
 
-            var selected = importer.Import(worldPath, north.RowId);
+            var selected = importer.Import(worldPath, north.Selection);
             var combined = importer.Import(worldPath);
 
             Assert.Equal(2, groups.Count);
             Assert.Equal(1, north.CompletedScienceIndexCount);
             Assert.True(north.IsReadable);
-            Assert.Equal(north.RowId, selected.ImportedColonyGroupRowId);
+            Assert.NotNull(north.StableIdentity);
+            Assert.Equal(north.StableIdentity, selected.ImportedColonyGroupIdentity);
             Assert.Equal(1, selected.ImportedColonyGroupCount);
             Assert.Equal(["pipliz.farming"], selected.UnlockedScienceIds);
             Assert.Equal(2, combined.ImportedColonyGroupCount);
             Assert.Equal(2, combined.UnlockedScienceIds.Count);
             var reopenedNorth = Assert.Single(importer.GetColonyGroups(worldPath), group => group.Label == "North");
-            Assert.Equal(north.RowId, reopenedNorth.RowId);
-            var missing = Assert.Throws<SelectedColonyGroupMissingException>(() => importer.Import(worldPath, 999));
+            Assert.Equal(north.StableIdentity, reopenedNorth.StableIdentity);
+            var missing = Assert.Throws<SelectedColonyGroupMissingException>(() => importer.Import(worldPath, new SaveGameColonyGroupSelection(null, "missing")));
             Assert.Equal("The selected colony group is no longer present in this save; existing progression was not changed.", missing.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void does_not_remap_a_saved_colony_group_when_its_sqlite_row_is_reused()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"colony-optimizer-{Guid.NewGuid():N}");
+        var worldPath = Path.Combine(root, "world.sqlite3");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
+                    CREATE TABLE colonygroups (
+                        id INTEGER PRIMARY KEY,
+                        json TEXT,
+                        points INTEGER,
+                        creation_date INTEGER,
+                        main_colony INTEGER,
+                        stats BLOB
+                    );
+                    INSERT INTO science_mapping (name, [index]) VALUES ('pipliz.farming', 2), ('pipliz.forestry', 7);
+                    INSERT INTO colonygroups (id, json, points, creation_date, main_colony) VALUES (1, '{"name":"North","science":{"completed":[2]}}', 0, 1, 1);
+                    INSERT INTO colonygroups (id, json, points, creation_date, main_colony) VALUES (2, '{"name":"South","science":{"completed":[7]}}', 0, 2, 0);
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var importer = new SaveGameImportService();
+            var north = Assert.Single(importer.GetColonyGroups(worldPath), group => group.Label == "North");
+            Assert.NotNull(north.StableIdentity);
+
+            using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    DELETE FROM colonygroups WHERE id = 1;
+                    INSERT INTO colonygroups (id, json, points, creation_date, main_colony) VALUES (1, '{"name":"Replacement","science":{"completed":[7]}}', 0, 3, 0);
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            Assert.Throws<SelectedColonyGroupMissingException>(() => importer.Import(worldPath, north.Selection));
+            var replacement = Assert.Single(importer.GetColonyGroups(worldPath), group => group.Label == "Replacement");
+            Assert.NotEqual(north.StableIdentity, replacement.StableIdentity);
         }
         finally
         {
@@ -954,7 +1020,7 @@ public sealed class ProductionOptimizerTests
             var importer = new SaveGameImportService();
             var malformed = Assert.Single(importer.GetColonyGroups(worldPath), group => !group.IsReadable);
 
-            var exception = Assert.Throws<SelectedColonyGroupUnreadableException>(() => importer.Import(worldPath, malformed.RowId));
+            var exception = Assert.Throws<SelectedColonyGroupUnreadableException>(() => importer.Import(worldPath, malformed.Selection));
             var combined = importer.Import(worldPath);
 
             Assert.Equal("The selected colony group could not be read; existing progression was not changed.", exception.Message);

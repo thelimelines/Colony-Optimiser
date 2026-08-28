@@ -24,7 +24,11 @@ public sealed class ProductionOptimizer
             .ToArray();
         var eligibility = DetermineEligibleRecipes(plan, availableRecipes);
         var externalItems = DetermineEffectiveExternalItems(plan, availableRecipes);
-        var result = new OptimizationResult { Demand = demand };
+        var result = new OptimizationResult
+        {
+            Demand = demand,
+            TotalGuards = plan.Guards.Where(assignment => assignment.Count > 0).Sum(assignment => (long)assignment.Count)
+        };
         result.Messages.AddRange(eligibility.Messages);
 
         AddPreflightMessages(demand, availableRecipes, eligibility, externalItems, result.Messages);
@@ -707,6 +711,7 @@ public sealed class OptimizationResult
     public List<ExternalRequirement> ExternalRequirements { get; } = [];
     public List<ProductionOutput> TotalOutputs { get; } = [];
     public List<ProductionFlow> ProductionFlows { get; } = [];
+    public long TotalGuards { get; set; }
     public long TotalWorkers => JobRequirements.Sum(requirement => requirement.Workers);
     public long TotalMachineBlocks => JobRequirements.Sum(requirement => requirement.MachineBlocks);
     public long TotalJobBlocks => TotalWorkers + TotalMachineBlocks;

@@ -1,4 +1,7 @@
 using System.IO;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using SQLitePCL;
@@ -10,7 +13,7 @@ public sealed class SaveGameImportService
     private static readonly object SqliteProviderLock = new();
     private static bool _sqliteProviderInitialised;
 
-    public SaveGameImportResult Import(string worldDatabasePath, long? colonyGroupRowId = null)
+    public SaveGameImportResult Import(string worldDatabasePath, SaveGameColonyGroupSelection? colonyGroupSelection = null)
     {
         using var connection = OpenReadOnlyConnection(worldDatabasePath);
 
@@ -29,10 +32,10 @@ public sealed class SaveGameImportService
         }
 
         var colonyGroups = ReadColonyGroups(connection);
-        var selectedGroups = colonyGroupRowId is { } selectedRowId
-            ? colonyGroups.Where(group => group.RowId == selectedRowId).ToArray()
-            : colonyGroups;
-        if (colonyGroupRowId is not null && selectedGroups.Count == 0)
+        var selectedGroups = colonyGroupSelection is null
+            ? colonyGroups
+            : colonyGroups.Where(group => Matches(colonyGroupSelection, group)).ToArray();
+        if (colonyGroupSelection is not null && selectedGroups.Count == 0)
         {
             throw new SelectedColonyGroupMissingException();
         }
@@ -47,7 +50,7 @@ public sealed class SaveGameImportService
                 continue;
             }
 
-            if (colonyGroupRowId is not null)
+            if (colonyGroupSelection is not null)
             {
                 throw new SelectedColonyGroupUnreadableException();
             }
@@ -55,7 +58,7 @@ public sealed class SaveGameImportService
 
         var unlocked = completedIndexes.Where(scienceByIndex.ContainsKey).Select(index => scienceByIndex[index])
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return new SaveGameImportResult(worldDatabasePath, unlocked, completedIndexes.Count, scienceByIndex.Count, importedGroupCount, colonyGroupRowId);
+        return new SaveGameImportResult(worldDatabasePath, unlocked, completedIndexes.Count, scienceByIndex.Count, importedGroupCount, colonyGroupSelection?.StableIdentity);
     }
 
     public IReadOnlyList<SaveGameColonyGroup> GetColonyGroups(string worldDatabasePath)
@@ -66,7 +69,7 @@ public sealed class SaveGameImportService
             {
                 var completedIndexes = new HashSet<int>();
                 var isReadable = TryReadCompletedScienceIndexes(group.Json, completedIndexes);
-                return new SaveGameColonyGroup(group.RowId, GetColonyGroupLabel(group.Json, group.RowId), completedIndexes.Count, isReadable);
+                return new SaveGameColonyGroup(group.RowId, group.StableIdentity, GetColonyGroupLabel(group.Json, group.RowId), completedIndexes.Count, isReadable);
             })
             .ToArray();
     }
@@ -165,19 +168,94 @@ public sealed class SaveGameImportService
     private static IReadOnlyList<StoredColonyGroup> ReadColonyGroups(SqliteConnection connection)
     {
         var groups = new List<StoredColonyGroup>();
+        var identityColumns = ReadStableIdentityColumns(connection);
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT rowid, json FROM colonygroups WHERE json IS NOT NULL ORDER BY rowid";
+        if (identityColumns.Count == 0)
+        {
+            command.CommandText = "SELECT rowid, json FROM colonygroups WHERE json IS NOT NULL ORDER BY rowid";
+            using var rowIdReader = command.ExecuteReader();
+            while (rowIdReader.Read())
+            {
+                if (!rowIdReader.IsDBNull(0) && !rowIdReader.IsDBNull(1))
+                {
+                    groups.Add(new StoredColonyGroup(rowIdReader.GetInt64(0), null, rowIdReader.GetString(1)));
+                }
+            }
+
+            return groups;
+        }
+
+        var identitySql = string.Join(", ", identityColumns.Select(column => QuoteIdentifier(column.Name)));
+        var primaryKeyOrderSql = string.Join(", ", identityColumns.Where(column => column.IsPrimaryKey).Select(column => QuoteIdentifier(column.Name)));
+        command.CommandText = $"SELECT json, {identitySql} FROM colonygroups WHERE json IS NOT NULL ORDER BY {primaryKeyOrderSql}";
         using var reader = command.ExecuteReader();
+        var displayRowId = 0L;
         while (reader.Read())
         {
-            if (!reader.IsDBNull(0) && !reader.IsDBNull(1))
+            if (!reader.IsDBNull(0))
             {
-                groups.Add(new StoredColonyGroup(reader.GetInt64(0), reader.GetString(1)));
+                groups.Add(new StoredColonyGroup(++displayRowId, CreateStableIdentity(identityColumns, reader, 1), reader.GetString(0)));
             }
         }
 
         return groups;
     }
+
+    private static IReadOnlyList<IdentityColumn> ReadStableIdentityColumns(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(\"colonygroups\")";
+        using var reader = command.ExecuteReader();
+        var columns = new List<IdentityColumn>();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(1) || reader.IsDBNull(5))
+            {
+                continue;
+            }
+
+            columns.Add(new IdentityColumn(reader.GetString(1), Convert.ToInt32(reader.GetValue(5), CultureInfo.InvariantCulture)));
+        }
+
+        var primaryKeyColumns = columns.Where(column => column.IsPrimaryKey).OrderBy(column => column.Position).ToArray();
+        if (primaryKeyColumns.Length == 0)
+        {
+            return [];
+        }
+
+        var creationDateColumn = columns.FirstOrDefault(column => !column.IsPrimaryKey && column.Name.Equals("creation_date", StringComparison.OrdinalIgnoreCase));
+        return creationDateColumn is null ? primaryKeyColumns : [.. primaryKeyColumns, creationDateColumn];
+    }
+
+    private static string CreateStableIdentity(IReadOnlyList<IdentityColumn> columns, SqliteDataReader reader, int firstValueOrdinal)
+    {
+        var identity = new StringBuilder();
+        for (var index = 0; index < columns.Count; index++)
+        {
+            AppendIdentityPart(identity, columns[index].Name);
+            var value = reader.GetValue(firstValueOrdinal + index);
+            AppendIdentityPart(identity, value switch
+            {
+                byte[] bytes => Convert.ToHexString(bytes),
+                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                _ => value.ToString()
+            });
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity.ToString())));
+    }
+
+    private static void AppendIdentityPart(StringBuilder destination, string? value)
+    {
+        var text = value ?? "<null>";
+        destination.Append(text.Length).Append(':').Append(text).Append('|');
+    }
+
+    private static string QuoteIdentifier(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
+
+    private static bool Matches(SaveGameColonyGroupSelection selection, StoredColonyGroup group) => selection.StableIdentity is not null
+        ? selection.StableIdentity.Equals(group.StableIdentity, StringComparison.Ordinal)
+        : selection.RowId is { } rowId && rowId == group.RowId;
 
     private static string GetColonyGroupLabel(string colonyJson, long rowId)
     {
@@ -241,7 +319,11 @@ public sealed class SaveGameImportService
         }
     }
 
-    private sealed record StoredColonyGroup(long RowId, string Json);
+    private sealed record IdentityColumn(string Name, int Position)
+    {
+        public bool IsPrimaryKey => Position > 0;
+    }
+    private sealed record StoredColonyGroup(long RowId, string? StableIdentity, string Json);
 }
 
 public sealed class SelectedColonyGroupUnreadableException : Exception
@@ -260,13 +342,16 @@ public sealed class SelectedColonyGroupMissingException : Exception
     }
 }
 
-public sealed record SaveGameColonyGroup(long RowId, string Label, int CompletedScienceIndexCount, bool IsReadable)
+public sealed record SaveGameColonyGroup(long RowId, string? StableIdentity, string Label, int CompletedScienceIndexCount, bool IsReadable)
 {
+    public SaveGameColonyGroupSelection Selection => new(RowId, StableIdentity);
     public string DisplayName => IsReadable
-        ? $"{Label} (group {RowId}, {CompletedScienceIndexCount:N0} completed sciences)"
-        : $"{Label} (group {RowId}, unreadable JSON)";
+        ? $"{Label} ({CompletedScienceIndexCount:N0} completed sciences)"
+        : $"{Label} (unreadable JSON)";
     public override string ToString() => DisplayName;
 }
+
+public sealed record SaveGameColonyGroupSelection(long? RowId, string? StableIdentity);
 
 public sealed record SaveGameImportResult(
     string WorldDatabasePath,
@@ -274,4 +359,4 @@ public sealed record SaveGameImportResult(
     int CompletedScienceIndexCount,
     int KnownScienceCount,
     int ImportedColonyGroupCount = 0,
-    long? ImportedColonyGroupRowId = null);
+    string? ImportedColonyGroupIdentity = null);

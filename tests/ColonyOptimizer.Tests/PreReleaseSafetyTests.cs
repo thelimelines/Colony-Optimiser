@@ -5,6 +5,7 @@ using System.Text;
 using ColonyOptimizer.App;
 using ColonyOptimizer.Core;
 using ColonyOptimizer.GameData;
+using Microsoft.Data.Sqlite;
 
 namespace ColonyOptimizer.Tests;
 
@@ -116,6 +117,59 @@ public sealed class PreReleaseSafetyTests : IDisposable
         Assert.Equal(StochasticOutputPolicy.Conservative, settings.StochasticOutputPolicy);
         Assert.True(settings.TimingOverride.IsEnabled);
         Assert.Equal(90m, settings.TimingOverride.GameTimeScale);
+    }
+
+    [Fact]
+    public void changing_game_data_with_a_linked_save_preserves_manual_progression()
+    {
+        var currentPlan = new SavedPlanDocument { Plan = new ProductionPlan(), Settings = new OptimizationSettings() };
+        var shouldImport = (bool)typeof(MainWindowViewModel)
+            .GetMethod("ShouldAutomaticallyImportLinkedSave", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, [currentPlan, false])!;
+        var shouldImportWithoutPlan = (bool)typeof(MainWindowViewModel)
+            .GetMethod("ShouldAutomaticallyImportLinkedSave", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, [null, false])!;
+        var shouldImportAfterRestore = (bool)typeof(MainWindowViewModel)
+            .GetMethod("ShouldAutomaticallyImportLinkedSave", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, [null, true])!;
+
+        Assert.False(shouldImport);
+        Assert.True(shouldImportWithoutPlan);
+        Assert.False(shouldImportAfterRestore);
+    }
+
+    [Fact]
+    public void a_malformed_selected_colony_group_preserves_current_progression()
+    {
+        Directory.CreateDirectory(_root);
+        var worldPath = Path.Combine(_root, "malformed-world.sqlite3");
+        typeof(SaveGameImportService).GetMethod("EnsureSqliteProvider", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, null);
+        using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
+                CREATE TABLE colonygroups (json TEXT);
+                INSERT INTO science_mapping (name, [index]) VALUES ('science', 1);
+                INSERT INTO colonygroups (json) VALUES ('{"science":');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var viewModel = new MainWindowViewModel { LinkedSaveGamePath = worldPath };
+        Invoke(viewModel, "ApplyDatabase", CreateSwitchDatabase("first"), null);
+        viewModel.ScienceRows.Single().IsSelected = true;
+        viewModel.ToolRows.Single().IsSelected = true;
+        typeof(MainWindowViewModel).GetField("selectedColonyGroup", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(viewModel, new ColonyGroupImportOption(1, "Malformed group"));
+
+        Invoke(viewModel, "TryApplyLinkedSave", false);
+
+        Assert.True(viewModel.ScienceRows.Single().IsSelected);
+        Assert.True(viewModel.ToolRows.Single().IsSelected);
+        Assert.Equal("The selected colony group could not be read; existing progression was not changed.", viewModel.SaveImportStatus);
     }
 
     [Fact]
@@ -267,7 +321,7 @@ public sealed class PreReleaseSafetyTests : IDisposable
             new ItemDefinition { Id = "tools", DisplayName = "Tools" }
         ]);
         database.Sciences.Add(new ScienceDefinition { Id = "science", DisplayName = "Science" });
-        database.Tools.Add(new ToolDefinition { Id = "tools", DisplayName = "Tools" });
+        database.Tools.Add(new ToolDefinition { Id = "tools", DisplayName = "Tools", RequiredScience = "science" });
         database.Recipes.AddRange(
         [
             Recipe("recipe-one", "First recipe"),

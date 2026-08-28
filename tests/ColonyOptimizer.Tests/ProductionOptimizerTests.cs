@@ -909,11 +909,57 @@ public sealed class ProductionOptimizerTests
 
             Assert.Equal(2, groups.Count);
             Assert.Equal(1, north.CompletedScienceIndexCount);
+            Assert.True(north.IsReadable);
             Assert.Equal(north.RowId, selected.ImportedColonyGroupRowId);
             Assert.Equal(1, selected.ImportedColonyGroupCount);
             Assert.Equal(["pipliz.farming"], selected.UnlockedScienceIds);
             Assert.Equal(2, combined.ImportedColonyGroupCount);
             Assert.Equal(2, combined.UnlockedScienceIds.Count);
+            var reopenedNorth = Assert.Single(importer.GetColonyGroups(worldPath), group => group.Label == "North");
+            Assert.Equal(north.RowId, reopenedNorth.RowId);
+            var missing = Assert.Throws<SelectedColonyGroupMissingException>(() => importer.Import(worldPath, 999));
+            Assert.Equal("The selected colony group is no longer present in this save; existing progression was not changed.", missing.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void refuses_a_malformed_explicitly_selected_colony_group_without_breaking_combined_import()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"colony-optimizer-{Guid.NewGuid():N}");
+        var worldPath = Path.Combine(root, "world.sqlite3");
+        Directory.CreateDirectory(root);
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={worldPath};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = """
+                    CREATE TABLE science_mapping (name TEXT NOT NULL, [index] INTEGER NOT NULL);
+                    CREATE TABLE colonygroups (json TEXT);
+                    INSERT INTO science_mapping (name, [index]) VALUES ('pipliz.farming', 2);
+                    INSERT INTO colonygroups (json) VALUES ('{"science":');
+                    INSERT INTO colonygroups (json) VALUES ('{"science":{"completed":[2]}}');
+                    """;
+                command.ExecuteNonQuery();
+            }
+
+            var importer = new SaveGameImportService();
+            var malformed = Assert.Single(importer.GetColonyGroups(worldPath), group => !group.IsReadable);
+
+            var exception = Assert.Throws<SelectedColonyGroupUnreadableException>(() => importer.Import(worldPath, malformed.RowId));
+            var combined = importer.Import(worldPath);
+
+            Assert.Equal("The selected colony group could not be read; existing progression was not changed.", exception.Message);
+            Assert.Equal(["pipliz.farming"], combined.UnlockedScienceIds);
+            Assert.Equal(1, combined.ImportedColonyGroupCount);
         }
         finally
         {

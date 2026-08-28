@@ -4,6 +4,8 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 ## Unreleased
 
+## [1.1.0] - 2026-08-28
+
 ### Added
 
 - Read every linked save's colony groups and let multiplayer players import one group instead of always combining progress.
@@ -12,9 +14,10 @@ All notable user-facing changes are recorded here. Each release tag must have a 
 
 - Keep existing plan and export files intact when a save or export cannot be written, and show a clear recovery message.
 - Keep Steam library discovery and public game-data cache cleanup from preventing startup or obscuring a completed update.
-- Preserve the complete current plan when changing game-data source instead of leaving a partially reset plan that could be saved accidentally.
+- Preserve the complete current plan when changing game-data source, without re-importing a linked save over manual progression.
 - Link a world cleanly before game data is loaded, then import its progression automatically after data is available.
 - Keep a crop farm's default field geometry stable through plan save and reopen.
+- Keep current progression unchanged when an explicitly selected colony group's JSON cannot be read.
 
 ### Changed
 

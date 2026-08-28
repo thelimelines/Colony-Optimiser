@@ -394,8 +394,15 @@ public partial class MainWindowViewModel : ObservableObject
             var previousPlan = CaptureCurrentPlanState();
             var database = await Task.Run(() => _loader.Load(selectedPath));
             ApplyDatabase(database, previousPlan);
-            TryApplyLinkedSave();
-            await RestoreLastPlanIfAvailableAsync();
+            var restoredPlan = await RestoreLastPlanIfAvailableAsync();
+            if (ShouldAutomaticallyImportLinkedSave(previousPlan, restoredPlan))
+            {
+                TryApplyLinkedSave();
+            }
+            else
+            {
+                ReportDeferredLinkedSaveImport();
+            }
             _userSettings.LastGameDataDirectory = database.Source.SourcePath;
             _settingsStore.Save(_userSettings);
             StatusText = $"Loaded {database.Recipes.Count:N0} recipes";
@@ -443,8 +450,15 @@ public partial class MainWindowViewModel : ObservableObject
             var database = await Task.Run(() => _loader.Load(downloaded.GameDataPath));
             database.Source = new GameDataSourceInfo("GitHub cache", downloaded.GameDataPath, database.Source.Version, downloaded.Commit, downloaded.DownloadedAt);
             ApplyDatabase(database, previousPlan);
-            TryApplyLinkedSave();
-            await RestoreLastPlanIfAvailableAsync();
+            var restoredPlan = await RestoreLastPlanIfAvailableAsync();
+            if (ShouldAutomaticallyImportLinkedSave(previousPlan, restoredPlan))
+            {
+                TryApplyLinkedSave();
+            }
+            else
+            {
+                ReportDeferredLinkedSaveImport();
+            }
             _userSettings.LastGameDataDirectory = downloaded.GameDataPath;
             _settingsStore.Save(_userSettings);
             StatusText = "Downloaded and loaded latest public data";
@@ -948,7 +962,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task OpenPlanFromAsync(string path)
+    private async Task<bool> OpenPlanFromAsync(string path)
     {
         try
         {
@@ -964,23 +978,30 @@ public partial class MainWindowViewModel : ObservableObject
             _settingsStore.Save(_userSettings);
             RefreshRecentPlans();
             StatusText = sourceWarning ?? "Plan loaded";
+            return true;
         }
         catch (Exception exception)
         {
             FileLogger.Write(exception, "open-plan");
             ShowError($"The selected plan could not be opened: {exception.Message}");
+            return false;
         }
     }
 
-    private async Task RestoreLastPlanIfAvailableAsync()
+    private async Task<bool> RestoreLastPlanIfAvailableAsync()
     {
         if (_lastPlanRestored || string.IsNullOrWhiteSpace(_userSettings.LastPlanPath) || !File.Exists(_userSettings.LastPlanPath))
         {
-            return;
+            return false;
+        }
+
+        if (!await OpenPlanFromAsync(_userSettings.LastPlanPath))
+        {
+            return false;
         }
 
         _lastPlanRestored = true;
-        await OpenPlanFromAsync(_userSettings.LastPlanPath);
+        return true;
     }
 
     private void ApplyPlan(ProductionPlan plan, OptimizationSettings settings)
@@ -1197,6 +1218,24 @@ public partial class MainWindowViewModel : ObservableObject
             SaveImportStatus = $"Imported {imported.UnlockedScienceIds.Count:N0} completed sciences from {groupScope}; tool limits now match their unlocks.";
             StatusText = "Save progress imported";
         }
+        catch (SelectedColonyGroupUnreadableException exception)
+        {
+            FileLogger.Write(exception, "import-save-selected-colony-group");
+            SaveImportStatus = "The selected colony group could not be read; existing progression was not changed.";
+            if (showError)
+            {
+                ShowError(SaveImportStatus);
+            }
+        }
+        catch (SelectedColonyGroupMissingException exception)
+        {
+            FileLogger.Write(exception, "import-save-selected-colony-group");
+            SaveImportStatus = "The selected colony group is no longer present in this save; existing progression was not changed.";
+            if (showError)
+            {
+                ShowError(SaveImportStatus);
+            }
+        }
         catch (Exception exception)
         {
             FileLogger.Write(exception, "import-save");
@@ -1224,6 +1263,16 @@ public partial class MainWindowViewModel : ObservableObject
         if (importProgression)
         {
             TryApplyLinkedSave(showError: true);
+        }
+    }
+
+    private static bool ShouldAutomaticallyImportLinkedSave(SavedPlanDocument? previousPlan, bool restoredPlan) => previousPlan is null && !restoredPlan;
+
+    private void ReportDeferredLinkedSaveImport()
+    {
+        if (File.Exists(LinkedSaveGamePath))
+        {
+            SaveImportStatus = "Linked save was not re-imported to preserve the current plan. Select Import progression to update it.";
         }
     }
 
@@ -1269,8 +1318,14 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         var savedRowId = _userSettings.LinkedSaveColonyGroupRowId;
-        SelectedColonyGroup = ColonyGroupOptions.FirstOrDefault(option => option.RowId == savedRowId)
-            ?? ColonyGroupOptions.FirstOrDefault();
+        var selectedOption = ColonyGroupOptions.FirstOrDefault(option => option.RowId == savedRowId);
+        if (selectedOption is null && savedRowId is { } missingRowId)
+        {
+            selectedOption = ColonyGroupImportOption.Missing(missingRowId);
+            ColonyGroupOptions.Add(selectedOption);
+        }
+
+        SelectedColonyGroup = selectedOption ?? ColonyGroupOptions.FirstOrDefault();
         OnPropertyChanged(nameof(HasColonyGroupOptions));
     }
 
@@ -1789,6 +1844,7 @@ public sealed record WorldSaveOption(string Path)
 public sealed record ColonyGroupImportOption(long? RowId, string DisplayName)
 {
     public static ColonyGroupImportOption Combined { get; } = new(null, "All colony groups (combined — legacy behaviour)");
+    public static ColonyGroupImportOption Missing(long rowId) => new(rowId, $"Group {rowId} is no longer present — choose another scope");
     public override string ToString() => DisplayName;
 }
 

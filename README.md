@@ -26,7 +26,7 @@ It is an independent community project and is not affiliated with Pipliz.
 4. We recommend downloading the matching `.sha256` file for the chosen asset. Do not download the automatically generated `Source code` archives.
 5. Run the setup program or MSI. For the portable ZIP, extract it somewhere you can write to and run `ColonyOptimizer.exe`.
 
-The download includes the .NET runtime, so .NET, Python, and Steam do not need to be installed separately. It also includes Microsoft's small WebView2 online bootstrapper. WebView2 is already present on Windows 11 and most up-to-date Windows 10 installations; if it is missing, Colony Optimiser downloads and installs it automatically on first launch. Keep an internet connection until that one-time step completes. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page. Check the accompanying checksum if you want to confirm that the download arrived unchanged.
+The download includes the .NET runtime, so .NET, Python, and Steam do not need to be installed separately. It also includes Microsoft's small WebView2 online bootstrapper. WebView2 is already present on Windows 11 and most up-to-date Windows 10 installations; if it is missing, Colony Optimiser downloads and installs it automatically the first time you open the **Visualisation** tab. Keep an internet connection until that one-time step completes. SmartScreen can be cautious about new unsigned applications; only run a copy obtained from this repository's Releases page. Check the accompanying checksum if you want to confirm that the download arrived unchanged.
 
 ### Check the download (OPTIONAL)
 
@@ -40,9 +40,9 @@ Compare the displayed hash value with the value in the matching `.sha256` file f
 
 ## First use
 
-On first start, Colony Optimiser searches the usual Steam library locations for Colony Survival saves and lets you choose a world. You can skip this and use the planner without linking a save. If you link a world before loading game data, the link is retained and its progression imports automatically once data is available.
+On first start, Colony Optimiser searches the usual Steam library locations for Colony Survival saves and lets you choose a world. You can skip this and use the planner without linking a save. If you link a world before loading game data, the link is retained and its progression imports automatically once data is available when there is no plan to preserve.
 
-To obtain recipe data, open the settings cog and either select your installed Colony Survival game-data folder or use the in-app public-data download. The app reads a selected `world.sqlite3` save to preselect completed sciences and available tools. For a multiplayer save, use **Import scope** to select a colony group; **All colony groups** remains the default to preserve earlier combined-import behaviour. It never changes your save file or your game installation.
+To obtain recipe data, open the settings cog and either select your installed Colony Survival game-data folder or use the in-app public-data download. The app reads a selected `world.sqlite3` save to preselect completed sciences and available tools. For a multiplayer save, choose a colony group under **Import scope**, then select **Import progression**. **All colony groups** remains the default to preserve earlier combined-import behaviour. It never changes your save file or your game installation.
 
 To create a plan:
 
@@ -60,7 +60,7 @@ Colony Optimiser loads recipes and timing dynamically rather than embedding one 
 ## Privacy and safety
 
 - The app works locally and has no telemetry or sign-in.
-- Network access can occur when you select **Download latest public data**, which downloads public Colony Survival data and commit information from GitHub, or when visualisation initialisation fails and the bundled Microsoft WebView2 bootstrapper attempts to install or repair its runtime. The app does not check for updates automatically.
+- Network access can occur when you select **Download latest public data**, which downloads public Colony Survival data and commit information from GitHub, or when you first open **Visualisation** and the bundled Microsoft WebView2 bootstrapper needs to install or repair its runtime. The app does not check for updates automatically.
 - Game saves are opened read-only. Do not attach save files to bug reports unless requested directly.
 - Settings, cached public game data, and logs are kept under your Windows local app-data folder. Delete the `ColonyOptimizer` folder there to reset the app.
 - Download updates only from this repository's Releases page. Verifying the SHA-256 checksum is recommended, particularly for an unsigned release.
@@ -73,7 +73,7 @@ The idea for Colony Optimiser was inspired by [Factory Calculator](https://facto
 
 ## For contributors
 
-Technical material is kept out of the user guide. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then see the [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), [game-data validation](docs/GAME_DATA_VALIDATION.md), [release instructions](docs/RELEASING.md), and [changelog](CHANGELOG.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Technical material is kept out of the user guide. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for local build/run and test instructions, then see the [architecture](docs/ARCHITECTURE.md), [solver model](docs/SOLVER_MODEL.md), [game-data validation](docs/GAME_DATA_VALIDATION.md), [release instructions](docs/RELEASING.md), and [changelog](CHANGELOG.md). Bundled visualisation-library notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Licence
 

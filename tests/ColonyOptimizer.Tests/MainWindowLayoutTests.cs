@@ -255,6 +255,7 @@ public sealed class MainWindowLayoutTests
         Assert.Contains("## Unreleased", changelog, StringComparison.Ordinal);
         Assert.Contains("## [1.0.5]", changelog, StringComparison.Ordinal);
         Assert.Contains("## [1.0.6] - 2026-08-28", changelog, StringComparison.Ordinal);
+        Assert.Contains("## [1.1.0] - 2026-08-28", changelog, StringComparison.Ordinal);
         Assert.Contains("$headingPattern", workflow, StringComparison.Ordinal);
         Assert.Contains("<Version>1.1.0</Version>", File.ReadAllText(Path.Combine(repository, "Directory.Build.props")), StringComparison.Ordinal);
         Assert.Contains("last-opened or recent plans", theme, StringComparison.Ordinal);

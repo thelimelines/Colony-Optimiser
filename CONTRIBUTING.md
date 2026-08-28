@@ -50,6 +50,23 @@ dotnet restore installer\ColonyOptimizer.Setup\ColonyOptimizer.Setup.wixproj --l
 
 These commands verify the committed NuGet dependency graph. Use `--force-evaluate` instead of `--locked-mode` only when intentionally updating dependencies, then review and commit the resulting lock-file changes with that update.
 
+## Build and run locally
+
+You do not need a separate WPF or game-development environment to run the app from source: Windows and the .NET 10 SDK are enough. From the repository root, restore once, then launch the Debug build:
+
+```powershell
+dotnet restore ColonyOptimizer.slnx --runtime win-x64 --locked-mode
+dotnet run --project src\ColonyOptimizer.App\ColonyOptimizer.App.csproj
+```
+
+The first command requires internet access to obtain the locked NuGet packages if they are not already cached. The second command builds the WPF app when needed and opens Colony Optimiser. To launch the locally built Release configuration instead, run:
+
+```powershell
+dotnet run --project src\ColonyOptimizer.App\ColonyOptimizer.App.csproj -c Release --no-restore
+```
+
+On first launch, use the settings cog to select an installed Colony Survival `gamedata` folder or choose **Download latest public data**. A separate public game-data checkout is required for the automated tests below, but not to open and use the application. A Visual Studio user can open `ColonyOptimizer.slnx`, set `ColonyOptimizer.App` as the startup project, and use the same Debug/Release configurations.
+
 ## Testing
 
 Run the automated tests and Release build from the repository root:

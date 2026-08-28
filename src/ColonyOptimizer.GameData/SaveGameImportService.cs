@@ -34,18 +34,28 @@ public sealed class SaveGameImportService
             : colonyGroups;
         if (colonyGroupRowId is not null && selectedGroups.Count == 0)
         {
-            throw new InvalidDataException("The selected colony group was not found in this world save.");
+            throw new SelectedColonyGroupMissingException();
         }
 
         var completedIndexes = new HashSet<int>();
+        var importedGroupCount = 0;
         foreach (var colonyGroup in selectedGroups)
         {
-            ReadCompletedScienceIndexes(colonyGroup.Json, completedIndexes);
+            if (TryReadCompletedScienceIndexes(colonyGroup.Json, completedIndexes))
+            {
+                importedGroupCount++;
+                continue;
+            }
+
+            if (colonyGroupRowId is not null)
+            {
+                throw new SelectedColonyGroupUnreadableException();
+            }
         }
 
         var unlocked = completedIndexes.Where(scienceByIndex.ContainsKey).Select(index => scienceByIndex[index])
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return new SaveGameImportResult(worldDatabasePath, unlocked, completedIndexes.Count, scienceByIndex.Count, selectedGroups.Count, colonyGroupRowId);
+        return new SaveGameImportResult(worldDatabasePath, unlocked, completedIndexes.Count, scienceByIndex.Count, importedGroupCount, colonyGroupRowId);
     }
 
     public IReadOnlyList<SaveGameColonyGroup> GetColonyGroups(string worldDatabasePath)
@@ -55,8 +65,8 @@ public sealed class SaveGameImportService
             .Select(group =>
             {
                 var completedIndexes = new HashSet<int>();
-                ReadCompletedScienceIndexes(group.Json, completedIndexes);
-                return new SaveGameColonyGroup(group.RowId, GetColonyGroupLabel(group.Json, group.RowId), completedIndexes.Count);
+                var isReadable = TryReadCompletedScienceIndexes(group.Json, completedIndexes);
+                return new SaveGameColonyGroup(group.RowId, GetColonyGroupLabel(group.Json, group.RowId), completedIndexes.Count, isReadable);
             })
             .ToArray();
     }
@@ -87,14 +97,33 @@ public sealed class SaveGameImportService
         return File.Exists(databasePath) ? databasePath : null;
     }
 
-    private static void ReadCompletedScienceIndexes(string colonyJson, ISet<int> destination)
+    private static bool TryReadCompletedScienceIndexes(string colonyJson, ISet<int> destination)
     {
         try
         {
             using var document = JsonDocument.Parse(colonyJson);
-            if (!document.RootElement.TryGetProperty("science", out var science) || !science.TryGetProperty("completed", out var completed) || completed.ValueKind != JsonValueKind.Array)
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return;
+                return false;
+            }
+            if (!document.RootElement.TryGetProperty("science", out var science))
+            {
+                return true;
+            }
+
+            if (science.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (!science.TryGetProperty("completed", out var completed))
+            {
+                return true;
+            }
+
+            if (completed.ValueKind != JsonValueKind.Array)
+            {
+                return false;
             }
 
             foreach (var value in completed.EnumerateArray())
@@ -104,10 +133,12 @@ public sealed class SaveGameImportService
                     destination.Add(index);
                 }
             }
+
+            return true;
         }
         catch (JsonException)
         {
-            // A malformed colony record cannot safely contribute unlock information.
+            return false;
         }
     }
 
@@ -166,7 +197,7 @@ public sealed class SaveGameImportService
         }
         catch (JsonException)
         {
-            // Keep the stable database row identifier when a record's metadata is malformed.
+            // Fall back to the current database row identifier when a record's metadata is malformed.
         }
 
         return $"Colony group {rowId}";
@@ -213,9 +244,27 @@ public sealed class SaveGameImportService
     private sealed record StoredColonyGroup(long RowId, string Json);
 }
 
-public sealed record SaveGameColonyGroup(long RowId, string Label, int CompletedScienceIndexCount)
+public sealed class SelectedColonyGroupUnreadableException : Exception
 {
-    public string DisplayName => $"{Label} (group {RowId}, {CompletedScienceIndexCount:N0} completed sciences)";
+    public SelectedColonyGroupUnreadableException()
+        : base("The selected colony group could not be read; existing progression was not changed.")
+    {
+    }
+}
+
+public sealed class SelectedColonyGroupMissingException : Exception
+{
+    public SelectedColonyGroupMissingException()
+        : base("The selected colony group is no longer present in this save; existing progression was not changed.")
+    {
+    }
+}
+
+public sealed record SaveGameColonyGroup(long RowId, string Label, int CompletedScienceIndexCount, bool IsReadable)
+{
+    public string DisplayName => IsReadable
+        ? $"{Label} (group {RowId}, {CompletedScienceIndexCount:N0} completed sciences)"
+        : $"{Label} (group {RowId}, unreadable JSON)";
     public override string ToString() => DisplayName;
 }
 
